@@ -8,3 +8,4 @@ dist-renderer/
 .DS_Store
 release/
 release-download/
+release-v*/

@@ -16,6 +16,7 @@
     "fileSave": "保存",
     "fileSaveAs": "另存为...",
     "fileClose": "关闭文件",
+    "fileShowInFolder": "跳转文件所在文件夹",
     "about": "关于 {{name}}"
   },
   "editor": {
@@ -145,6 +146,8 @@
     "draftTtl2Days": "2 天",
     "draftTtl3Days": "3 天（推荐）",
     "draftTtl1Week": "1 周",
+    "draftTtl1Month": "1 个月",
+    "draftTtl1Year": "1 年",
     "autoLaunch": "开机自启",
     "autoLaunchDesc": "系统开机时自动启动 OncePad",
     "autoLaunchHidden": "启动后隐藏到后台",
@@ -209,6 +212,10 @@
     "seqAcceptOnTabDesc": "按 Tab 键接受建议",
     "seqAcceptOnEnter": "Enter 接受",
     "seqAcceptOnEnterDesc": "按 Enter 键接受建议（默认关闭，避免与列表结束行为冲突）",
+    "linkClickBehavior": "链接点击行为",
+    "linkClickBehaviorDesc": "点击 Markdown 预览区中的链接时，选择打开方式",
+    "linkClickDirect": "直接使用系统浏览器打开（推荐）",
+    "linkClickAsk": "弹窗询问后再打开",
     "notSet": "未设置",
     "blurToHide": "失焦自动隐藏",
     "blurToHideDesc": "窗口失去焦点时自动隐藏到托盘",
@@ -224,7 +231,13 @@
     "showMinimap": "缩略图",
     "experimental": "试验性",
     "showMinimapDesc": "在编辑区右侧显示文档缩略图，点击或拖动可快速跳转",
-    "showMinimapWarning": "此功能仍在开发中，缩略图定位可能存在偏差，后续版本将持续优化"
+    "showMinimapWarning": "此功能仍在开发中，缩略图定位可能存在偏差，后续版本将持续优化",
+    "tabFileAssociation": "文件关联",
+    "fileAssociationTitle": "文件关联管理",
+    "fileAssociationDesc": "管理 OncePad 关联的文件类型。默认关联 Markdown 和纯文本文件，其他类型可手动开启。",
+    "fileAssociationDefault": "默认关联（已启用）",
+    "fileAssociationBatNote": "关于 .bat / .cmd 文件",
+    "fileAssociationBatNoteDesc": "OncePad 永远不会接管 .bat / .cmd 文件关联，以保证开发者正常使用批处理脚本。如需用 OncePad 编辑 .bat 文件，请右键选择“打开方式”。"
   },
   "about": {
     "description": "轻量级即唤即用的随身笔记本，所有零散文字都有一处安放之地",

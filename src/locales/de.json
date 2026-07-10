@@ -16,6 +16,7 @@
     "fileSave": "Speichern",
     "fileSaveAs": "Speichern unter...",
     "fileClose": "Datei schließen",
+    "fileShowInFolder": "Im Ordner anzeigen",
     "about": "Über {{name}}"
   },
   "editor": {
@@ -32,7 +33,8 @@
     "words": "{{count}} Wörter",
     "chars": "{{count}} Zeichen",
     "lines": "{{count}} Zeilen",
-    "outline": "Gliederung"
+    "outline": "Gliederung",
+    "linkOpenConfirm": "Diesen Link im Standardbrowser des Systems öffnen?"
   },
   "notes": {
     "title": "Notizen",
@@ -145,6 +147,8 @@
     "draftTtl2Days": "2 Tage",
     "draftTtl3Days": "3 Tage (empfohlen)",
     "draftTtl1Week": "1 Woche",
+    "draftTtl1Month": "1 Monat",
+    "draftTtl1Year": "1 Jahr",
     "autoLaunch": "Beim Start öffnen",
     "autoLaunchDesc": "OncePad automatisch starten, wenn das System hochfährt",
     "autoLaunchHidden": "Versteckt im Hintergrund starten",
@@ -224,7 +228,17 @@
     "showMinimap": "Minimap",
     "experimental": "Experimentell",
     "showMinimapDesc": "Eine Dokument-Minimap auf der rechten Seite des Editors anzeigen, zur schnellen Navigation",
-    "showMinimapWarning": "Diese Funktion befindet sich noch in der Entwicklung. Die Positionierung der Minimap kann ungenau sein. Wird in zukünftigen Versionen verbessert."
+    "showMinimapWarning": "Diese Funktion befindet sich noch in der Entwicklung. Die Positionierung der Minimap kann ungenau sein. Wird in zukünftigen Versionen verbessert.",
+    "linkClickBehavior": "Link-Klick-Verhalten",
+    "linkClickBehaviorDesc": "Wählen, wie Links im Markdown-Vorschaubereich geöffnet werden",
+    "linkClickDirect": "Direkt im Systembrowser öffnen (empfohlen)",
+    "linkClickAsk": "Vor dem Öffnen fragen",
+    "tabFileAssociation": "Dateizuordnungen",
+    "fileAssociationTitle": "Dateizuordnungsverwaltung",
+    "fileAssociationDesc": "Verwalten, welche Dateitypen OncePad verarbeitet. Markdown und Klartext sind standardmäßig zugeordnet; andere können manuell aktiviert werden.",
+    "fileAssociationDefault": "Standardzuordnungen (aktiviert)",
+    "fileAssociationBatNote": "Zu .bat / .cmd-Dateien",
+    "fileAssociationBatNoteDesc": "OncePad übernimmt niemals .bat / .cmd-Dateizuordnungen, um sicherzustellen, dass Entwickler Batch-Skripte normal verwenden können. Um .bat-Dateien in OncePad zu bearbeiten, klicken Sie mit der rechten Maustaste und wählen \"Öffnen mit\"."
   },
   "about": {
     "description": "Ein leichter, jederzeit verfügbarer Notizblock",

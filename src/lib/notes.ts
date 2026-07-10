@@ -3,10 +3,18 @@ import type { NoteIndexEntry } from '../types'
 // 笔记排序方式：updated=按更新时间，title=按标题，color=按颜色
 export type SortBy = 'updated' | 'title' | 'color'
 
-// 草稿过期时间：3 天
+// 草稿过期时间：3 天（默认值，实际根据用户配置的 draftTtlDays 动态计算）
 export const DRAFT_TTL_MS = 3 * 24 * 60 * 60 * 1000
 // 即将过期阈值：24 小时
 export const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000
+
+// v1.2.0 #6：根据 draftTtlDays 计算草稿过期时间（毫秒）
+// 支持的值：1/2/3/7/30/365 天，默认 3 天
+export function getDraftTtlMs(days: number): number {
+  const validDays = [1, 2, 3, 7, 30, 365]
+  const d = validDays.includes(days) ? days : 3
+  return d * 24 * 60 * 60 * 1000
+}
 
 // 笔记列表排序：置顶优先，再按更新时间（倒序）/ 标题 / 颜色
 export function sortNotes(list: NoteIndexEntry[], sortBy: SortBy): NoteIndexEntry[] {

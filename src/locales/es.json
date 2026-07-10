@@ -16,6 +16,7 @@
     "fileSave": "Guardar",
     "fileSaveAs": "Guardar como...",
     "fileClose": "Cerrar archivo",
+    "fileShowInFolder": "Mostrar en carpeta",
     "about": "Acerca de {{name}}"
   },
   "editor": {
@@ -32,7 +33,8 @@
     "words": "{{count}} palabras",
     "chars": "{{count}} caracteres",
     "lines": "{{count}} líneas",
-    "outline": "Esquema"
+    "outline": "Esquema",
+    "linkOpenConfirm": "¿Abrir este enlace en el navegador predeterminado del sistema?"
   },
   "notes": {
     "title": "Notas",
@@ -145,6 +147,8 @@
     "draftTtl2Days": "2 días",
     "draftTtl3Days": "3 días (recomendado)",
     "draftTtl1Week": "1 semana",
+    "draftTtl1Month": "1 mes",
+    "draftTtl1Year": "1 año",
     "autoLaunch": "Iniciar al arrancar",
     "autoLaunchDesc": "Iniciar OncePad automáticamente al arrancar el sistema",
     "autoLaunchHidden": "Iniciar oculto en segundo plano",
@@ -224,7 +228,17 @@
     "showMinimap": "Minimapa",
     "experimental": "Experimental",
     "showMinimapDesc": "Muestra un minimapa del documento a la derecha del editor para navegación rápida",
-    "showMinimapWarning": "Esta función aún está en desarrollo. La posición del minimapa puede ser imprecisa. Se mejorará en futuras versiones."
+    "showMinimapWarning": "Esta función aún está en desarrollo. La posición del minimapa puede ser imprecisa. Se mejorará en futuras versiones.",
+    "linkClickBehavior": "Comportamiento al hacer clic en enlaces",
+    "linkClickBehaviorDesc": "Elegir cómo se abren los enlaces en el área de vista previa de Markdown",
+    "linkClickDirect": "Abrir directamente en el navegador del sistema (recomendado)",
+    "linkClickAsk": "Preguntar antes de abrir",
+    "tabFileAssociation": "Asociaciones de archivos",
+    "fileAssociationTitle": "Gestión de asociaciones de archivos",
+    "fileAssociationDesc": "Administrar qué tipos de archivos maneja OncePad. Markdown y texto plano están asociados por defecto; otros pueden activarse manualmente.",
+    "fileAssociationDefault": "Asociaciones predeterminadas (activadas)",
+    "fileAssociationBatNote": "Sobre archivos .bat / .cmd",
+    "fileAssociationBatNoteDesc": "OncePad nunca tomará las asociaciones de archivos .bat / .cmd para garantizar que los desarrolladores puedan usar scripts batch normalmente. Para editar archivos .bat en OncePad, haga clic derecho y elija \"Abrir con\"."
   },
   "about": {
     "description": "Un bloc de notas ligero, siempre disponible",

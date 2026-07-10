@@ -54,6 +54,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setEnableSequenceSuggestion: (enabled: boolean) => ipcRenderer.invoke('set-enable-sequence-suggestion', enabled),
   // v1.1.0：序号补全接受方式（key: seqAcceptOnType / seqAcceptOnTab / seqAcceptOnEnter）
   setSeqAcceptMode: (key: string, enabled: boolean) => ipcRenderer.invoke('set-seq-accept-mode', key, enabled),
+  // v1.2.0 P0-A：链接点击行为设置（direct=直接打开，ask=弹窗询问）
+  setLinkClickBehavior: (behavior: 'direct' | 'ask') => ipcRenderer.invoke('set-link-click-behavior', behavior),
+  // v1.2.0 P0-B：获取可选文件关联分组列表及当前启用状态
+  getFileAssociationGroups: () => ipcRenderer.invoke('get-file-association-groups'),
+  // v1.2.0 P0-B：设置文件关联分组（动态注册/注销 Windows 注册表）
+  setFileAssociationGroup: (groupId: string, enabled: boolean) => ipcRenderer.invoke('set-file-association-group', groupId, enabled),
 
   // ===== 工作区相关 IPC 方法 =====
   getWorkspaces: () => ipcRenderer.invoke('get-workspaces'),
@@ -109,6 +115,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // v1.1.1：打开日志文件夹（设置界面"打开日志文件夹"按钮）
   openLogsFolder: () => ipcRenderer.invoke('open-logs-folder'),
+  // v1.2.0 #7：在系统资源管理器中显示文件所在文件夹（高亮选中文件）
+  showFileInFolder: (filePath: string) => ipcRenderer.invoke('show-file-in-folder', filePath),
   // v1.1.1：获取日志存储路径（设置界面显示）
   getLogsPath: () => ipcRenderer.invoke('get-logs-path'),
   // v1.1.1：渲染进程写入错误日志（前端 window.onerror 捕获后通过 IPC 发送）

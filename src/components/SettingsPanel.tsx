@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Workspace, Tag } from '../types'
+import { normalizeFontName } from '../lib/format'
 
 // ===== 设置面板相关的本地类型 =====
 // 这两个类型原本定义在 App.tsx 中，拆分 SettingsPanel 组件时迁移至此处并导出，
@@ -126,6 +127,12 @@ interface SettingsPanelProps {
   seqAcceptOnTab: boolean
   seqAcceptOnEnter: boolean
   onSeqAcceptModeChange: (mode: 'tab' | 'enter', enabled: boolean) => void
+  // v1.2.0 P0-A：链接点击行为（direct=直接打开，ask=弹窗询问）
+  linkClickBehavior: 'direct' | 'ask'
+  onLinkClickBehaviorChange: (behavior: 'direct' | 'ask') => void
+  // v1.2.0 P0-B：可选文件关联分组列表及状态切换回调
+  fileAssociationGroups: Array<{ id: string; name: string; description: string; exts: string[]; enabled: boolean }>
+  onFileAssociationGroupChange: (groupId: string, enabled: boolean) => void
 
   // === 工作区与标签管理 ===
   workspaces: Workspace[]
@@ -157,7 +164,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
   const { t } = useTranslation()
   const tabsRef = useRef<HTMLDivElement>(null)
   const tabsIndicatorRef = useRef<HTMLDivElement>(null)
-  const [managementSubTab, setManagementSubTab] = useState<'workspace' | 'tag' | 'advanced'>('workspace')
+  const [managementSubTab, setManagementSubTab] = useState<'workspace' | 'tag' | 'advanced' | 'fileAssociation'>('workspace')
   // v1.1.1：异常日志路径（设置→管理→高级中显示，用户可快速跳转到日志目录）
   const [logsPath, setLogsPath] = useState('')
 
@@ -344,6 +351,8 @@ export function SettingsPanel(props: SettingsPanelProps) {
                 <option value={2}>{t('settings.draftTtl2Days', '2 天')}</option>
                 <option value={3}>{t('settings.draftTtl3Days', '3 天（推荐）')}</option>
                 <option value={7}>{t('settings.draftTtl1Week', '1 周')}</option>
+                <option value={30}>{t('settings.draftTtl1Month', '1 个月')}</option>
+                <option value={365}>{t('settings.draftTtl1Year', '1 年')}</option>
               </select>
             </div>
             <div className="settings-item">
@@ -420,7 +429,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                 onChange={props.onFontEnChange}
               >
                 {props.systemFonts.map((font) => (
-                  <option key={font} value={font} style={{ fontFamily: `"${font}", monospace` }}>
+                  <option key={font} value={font} style={{ fontFamily: `"${normalizeFontName(font)}", monospace` }}>
                     {font}
                   </option>
                 ))}
@@ -434,7 +443,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                 onChange={props.onFontCnChange}
               >
                 {props.systemFonts.map((font) => (
-                  <option key={font} value={font} style={{ fontFamily: `"${font}", sans-serif` }}>
+                  <option key={font} value={font} style={{ fontFamily: `"${normalizeFontName(font)}", sans-serif` }}>
                     {font}
                   </option>
                 ))}
@@ -714,6 +723,21 @@ export function SettingsPanel(props: SettingsPanelProps) {
                 </select>
               </div>
             </div>
+            {/* v1.2.0 P0-A：链接点击行为设置 */}
+            <div className="settings-item">
+              <div className="settings-label">{t('settings.linkClickBehavior', '链接点击行为')}</div>
+              <div className="setting-description" style={{ marginBottom: 8 }}>
+                {t('settings.linkClickBehaviorDesc', '点击 Markdown 预览区中的链接时，选择打开方式')}
+              </div>
+              <select
+                className="settings-select settings-select-full"
+                value={props.linkClickBehavior}
+                onChange={(e) => props.onLinkClickBehaviorChange(e.target.value as 'direct' | 'ask')}
+              >
+                <option value="direct">{t('settings.linkClickDirect', '直接使用系统浏览器打开（推荐）')}</option>
+                <option value="ask">{t('settings.linkClickAsk', '弹窗询问后再打开')}</option>
+              </select>
+            </div>
             {/* v1.1.0：序号补全（VS Code 风格 inline suggestion）*/}
             <div className="settings-item">
               <div className="settings-row">
@@ -909,6 +933,12 @@ export function SettingsPanel(props: SettingsPanelProps) {
               >
                 {t('settings.tabAdvanced', '高级')}
               </button>
+              <button
+                className={`management-subtab ${managementSubTab === 'fileAssociation' ? 'active' : ''}`}
+                onClick={() => setManagementSubTab('fileAssociation')}
+              >
+                {t('settings.tabFileAssociation', '文件关联')}
+              </button>
             </div>
             {managementSubTab === 'workspace' && (
               <WorkspaceManager
@@ -970,6 +1000,66 @@ export function SettingsPanel(props: SettingsPanelProps) {
                   </div>
                 </div>
                 {/* v1.1.0：序号补全已移至"编辑器"标签页（更符合功能归属）*/}
+              </>
+            )}
+            {managementSubTab === 'fileAssociation' && (
+              <>
+                <div className="settings-item">
+                  <div className="wtm-section-title">{t('settings.fileAssociationTitle', '文件关联管理')}</div>
+                  <div className="wtm-section-desc">
+                    {t('settings.fileAssociationDesc', '管理 OncePad 关联的文件类型。默认关联 Markdown 和纯文本文件，其他类型可手动开启。')}
+                  </div>
+                </div>
+                {/* 默认关联信息（只读展示）*/}
+                <div className="settings-item">
+                  <div className="settings-row">
+                    <div>
+                      <div className="settings-label">{t('settings.fileAssociationDefault', '默认关联（已启用）')}</div>
+                      <div className="setting-description">
+                        .md / .markdown / .txt / .text / .log / .json / .yml / .yaml
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked={true} disabled />
+                      <span className="switch-slider" />
+                    </label>
+                  </div>
+                </div>
+                {/* 可选关联分组（动态注册）*/}
+                {props.fileAssociationGroups.map((group) => (
+                  <div key={group.id} className="settings-item">
+                    <div className="settings-row">
+                      <div>
+                        <div className="settings-label">{group.name}</div>
+                        <div className="setting-description">
+                          {group.description}
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                            {group.exts.map(e => `.${e}`).join(' / ')}
+                          </div>
+                        </div>
+                      </div>
+                      <label className="switch">
+                        <input
+                          type="checkbox"
+                          checked={group.enabled}
+                          onChange={(e) => props.onFileAssociationGroupChange(group.id, e.target.checked)}
+                        />
+                        <span className="switch-slider" />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+                {/* .bat/.cmd 永不接管的说明 */}
+                <div className="settings-item">
+                  <div className="settings-row">
+                    <div>
+                      <div className="settings-label">{t('settings.fileAssociationBatNote', '关于 .bat / .cmd 文件')}</div>
+                      <div className="setting-description">
+                        {t('settings.fileAssociationBatNoteDesc', 'OncePad 永远不会接管 .bat / .cmd 文件关联，以保证开发者正常使用批处理脚本。如需用 OncePad 编辑 .bat 文件，请右键选择"打开方式"。')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </>

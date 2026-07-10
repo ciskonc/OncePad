@@ -2,6 +2,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, clipboard, dialog, Menu, T
 import path from 'node:path'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
+import { exec } from 'node:child_process'
 import fontList from 'font-list'
 
 process.env.DIST = path.join(__dirname, '../dist-renderer')
@@ -86,6 +87,33 @@ function writeErrorLog(level: string, message: string): void {
   }
 }
 
+// v1.2.0 #5：字体名引号规范化（与 src/lib/format.ts 中 normalizeFontName 逻辑一致）
+// 去除首尾引号（ASCII双引号/单引号/中文弯引号），避免 CSS 双重引号解析失败
+function normalizeFontName(fontName: string): string {
+  if (typeof fontName !== 'string') return ''
+  let s = fontName.trim()
+  while (s.length >= 2) {
+    const first = s[0]
+    const last = s[s.length - 1]
+    const isQuoted =
+      (first === '"' && last === '"') ||
+      (first === "'" && last === "'") ||
+      (first === '\u201C' && last === '\u201D') ||
+      (first === '\u2018' && last === '\u2019')
+    if (!isQuoted) break
+    s = s.slice(1, -1).trim()
+  }
+  return s
+}
+
+// v1.2.0 #6：根据 draftTtlDays 计算草稿过期时间（毫秒）
+// 支持的值：1/2/3/7/30/365 天，默认 3 天
+function getDraftTtlMs(days: number): number {
+  const validDays = [1, 2, 3, 7, 30, 365]
+  const d = validDays.includes(days) ? days : 3
+  return d * 24 * 60 * 60 * 1000
+}
+
 const defaultMod = 'Control'
 // v1.1.0：默认快捷键调整为 Alt+Q（单手可触），新建/复制默认为空（用户按需配置）
 const defaultShortcut = 'Alt+Q'
@@ -150,6 +178,10 @@ interface Config {
   seqAcceptOnTab?: boolean
   // Enter 键接受建议（注意：启用后双回车退出列表行为将改变）
   seqAcceptOnEnter?: boolean
+  // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
+  linkClickBehavior?: 'direct' | 'ask'
+  // v1.2.0 P0-B：已启用的文件关联分组 ID 列表（用户在设置中手动开启，动态注册到注册表）
+  fileAssociationGroups?: string[]
 }
 
 interface HistoryEntry {
@@ -223,6 +255,67 @@ interface NoteQuery {
   searchKeyword?: string
 }
 
+// ===== v1.2.0 P0-B：可选文件关联分组配置 =====
+// 默认关联的 8 个后缀（.md/.markdown/.txt/.text/.log/.json/.yml/.yaml）通过 package.json
+// fileAssociations 静态注册（安装时写入注册表）。
+// 以下分组为"可选关联"，用户在设置面板"文件关联"子标签中手动开启后动态注册到 Windows 注册表。
+// 注意：.bat/.cmd 不在任何分组中，永远不接管（用户右键"打开方式"选择 OncePad 时仍可正常编辑）。
+interface FileAssociationGroup {
+  id: string
+  name: string
+  description: string
+  exts: string[]
+  progId: string  // 动态注册时写入注册表的 ProgID
+}
+
+const FILE_ASSOCIATION_GROUPS: FileAssociationGroup[] = [
+  {
+    id: 'webCode',
+    name: 'Web 代码',
+    description: 'HTML / CSS / XML / SVG / Vue / Svelte 等标记和样式文件',
+    exts: ['html', 'htm', 'xml', 'svg', 'vue', 'svelte', 'css', 'scss', 'sass', 'less'],
+    progId: 'OncePad.WebCode',
+  },
+  {
+    id: 'sourceCode',
+    name: '通用代码',
+    description: 'JavaScript / TypeScript / Python / Java / C++ 等编程语言源代码',
+    exts: ['js', 'ts', 'jsx', 'tsx', 'mjs', 'cjs', 'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'go', 'rs', 'swift', 'kt', 'scala', 'clj', 'ex', 'exs'],
+    progId: 'OncePad.SourceCode2',
+  },
+  {
+    id: 'configExt',
+    name: '扩展配置文件',
+    description: 'TOML / INI / Conf 等配置文件（JSON / YML / YAML 已默认关联）',
+    exts: ['toml', 'ini', 'conf', 'cfg', 'properties'],
+    progId: 'OncePad.ConfigExt',
+  },
+  {
+    id: 'data',
+    name: '数据文件',
+    description: 'CSV / TSV / SQL 等数据文件',
+    exts: ['csv', 'tsv', 'sql'],
+    progId: 'OncePad.DataFile',
+  },
+  {
+    id: 'script',
+    name: '脚本文件',
+    description: 'Shell / PowerShell 脚本（不含 .bat / .cmd，避免影响系统批处理）',
+    exts: ['sh', 'bash', 'zsh', 'fish', 'ps1'],
+    progId: 'OncePad.ScriptFile',
+  },
+]
+
+// 辅助函数：执行系统命令并返回 Promise（windowsHide 避免弹出 cmd 窗口）
+function execAsync(cmd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { windowsHide: true }, (err, stdout) => {
+      if (err) reject(err)
+      else resolve(stdout)
+    })
+  })
+}
+
 function loadConfig(): Config {
   try {
     if (fs.existsSync(configPath)) {
@@ -244,8 +337,9 @@ function loadConfig(): Config {
         alwaysOnTop: saved.alwaysOnTop === true,
         indentType: saved.indentType === 'tab' ? 'tab' : 'space',
         indentSize: [2, 4, 6, 8].includes(Number(saved.indentSize)) ? Number(saved.indentSize) : 2,
-        fontEn: typeof saved.fontEn === 'string' && saved.fontEn ? saved.fontEn : 'SF Mono',
-        fontCn: typeof saved.fontCn === 'string' && saved.fontCn ? saved.fontCn : 'Microsoft YaHei',
+        // v1.2.0 #5：对加载的字体名进行引号规范化，处理旧数据中可能残留的引号
+        fontEn: normalizeFontName(typeof saved.fontEn === 'string' && saved.fontEn ? saved.fontEn : 'SF Mono'),
+        fontCn: normalizeFontName(typeof saved.fontCn === 'string' && saved.fontCn ? saved.fontCn : 'Microsoft YaHei'),
         fontSize: Number.isFinite(Number(saved.fontSize)) && Number(saved.fontSize) >= 12 && Number(saved.fontSize) <= 24
           ? Number(saved.fontSize)
           : 14,
@@ -262,7 +356,7 @@ function loadConfig(): Config {
         closeLastWindowBehavior: ['hide', 'confirm', 'quit'].includes(saved.closeLastWindowBehavior)
           ? saved.closeLastWindowBehavior
           : 'hide',
-        draftTtlDays: [1, 2, 3, 7].includes(Number(saved.draftTtlDays)) ? Number(saved.draftTtlDays) : 3,
+        draftTtlDays: [1, 2, 3, 7, 30, 365].includes(Number(saved.draftTtlDays)) ? Number(saved.draftTtlDays) : 3,
         autoLaunch: saved.autoLaunch === true,
         autoLaunchHidden: saved.autoLaunchHidden === true,
         // 修复：必须显式加载 blurToHide 字段，否则 newWin.on('blur') 读取时始终为 undefined
@@ -299,6 +393,10 @@ function loadConfig(): Config {
         // v1.1.0：序号补全接受方式（方案 B：仅 Tab/Enter，移除"继续输入即接受"）
         seqAcceptOnTab: saved.seqAcceptOnTab !== false,
         seqAcceptOnEnter: saved.seqAcceptOnEnter === true,
+        // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
+        linkClickBehavior: saved.linkClickBehavior === 'ask' ? 'ask' : 'direct',
+        // v1.2.0 P0-B：已启用的文件关联分组 ID 列表（动态注册到注册表）
+        fileAssociationGroups: Array.isArray(saved.fileAssociationGroups) ? saved.fileAssociationGroups.filter((g: unknown) => typeof g === 'string') : [],
       }
     }
   } catch {}
@@ -342,6 +440,10 @@ function loadConfig(): Config {
       notes: true,
       settings: true,
     },
+    // v1.2.0 P0-A：默认直接用系统浏览器打开链接
+    linkClickBehavior: 'direct',
+    // v1.2.0 P0-B：默认不启用任何可选文件关联分组
+    fileAssociationGroups: [],
   }
 }
 
@@ -875,8 +977,9 @@ function migrateHistoryToNotes() {
     // 将每条记录转为 Note 对象并保存
     for (const entry of history) {
       const createdAt = entry.createdAt || new Date().toISOString()
-      // 草稿过期时间 = 创建时间 + 3天
-      const expiresAt = new Date(new Date(createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString()
+      // 草稿过期时间 = 创建时间 + draftTtlDays 天（v1.2.0 #6：使用 getDraftTtlMs 统一计算）
+      const ttlMs = getDraftTtlMs(config.draftTtlDays || 3)
+      const expiresAt = new Date(new Date(createdAt).getTime() + ttlMs).toISOString()
       // title = text 首行截取前60字符
       const firstLine = (entry.text || '').split('\n')[0] || ''
       const title = firstLine.slice(0, 60)
@@ -1363,6 +1466,28 @@ function createWindow(config: Config, filePath?: string) {
     menu.popup(newWin)
   })
 
+  // v1.2.0 P0-A Layer 1：拦截窗口内导航（根本防御）
+  // 根因：MD 预览区 <a href> 点击时 Electron 默认在当前窗口内加载网页，无返回按钮导致卡死
+  // 修复：所有非应用内部页面加载（file:// 加载 index.html）一律阻止，阻止后由渲染层走 openExternal
+  newWin.webContents.on('will-navigate', (event, url) => {
+    // 允许应用内部页面加载（file:// 协议加载 dist-renderer/index.html）
+    if (url.startsWith('file://')) return
+    // 允许 dev server 热更新导航（仅开发模式）
+    if (VITE_DEV_SERVER_URL && url.startsWith(VITE_DEV_SERVER_URL)) return
+    // 阻止所有其他导航（http/https/mailto/ftp/自定义协议等）
+    event.preventDefault()
+    writeErrorLog('WARN', `Blocked in-app navigation: ${url}`)
+  })
+
+  // v1.2.0 P0-A Layer 2：禁用窗口内新窗口打开（防御嵌套）
+  // 阻止 target="_blank" 或 window.open() 在应用内创建新 BrowserWindow
+  newWin.webContents.setWindowOpenHandler(({ url }) => {
+    // 所有 window.open 调用一律拒绝在应用内打开
+    // 渲染层应通过 openExternal IPC 走系统浏览器
+    writeErrorLog('WARN', `Blocked in-app window open: ${url}`)
+    return { action: 'deny' }
+  })
+
   // v1.1.1：渲染进程崩溃捕获（Electron 28+ 使用 render-process-gone 事件）
   newWin.webContents.on('render-process-gone', (_event, details) => {
     writeErrorLog('FATAL', `Renderer process gone: reason=${details.reason}, exitCode=${details.exitCode}`)
@@ -1649,7 +1774,10 @@ app.whenReady().then(() => {
   ipcMain.handle('get-system-fonts', async () => {
     try {
       const fonts = await fontList.getFonts()
-      return fonts.sort((a, b) => a.localeCompare(b))
+      // v1.2.0 #5：规范化字体名，去除 font-list 返回的首尾引号（如 '"宋体"' → '宋体'）
+      const normalized = fonts.map((f) => normalizeFontName(f)).filter((f) => f.length > 0)
+      // 去重后排序
+      return [...new Set(normalized)].sort((a, b) => a.localeCompare(b))
     } catch {
       return []
     }
@@ -1862,11 +1990,41 @@ app.whenReady().then(() => {
   })
 
   // 设置草稿自动清理时长（天）
+  // v1.2.0 #6：新增 30 天（1 个月）和 365 天（1 年）选项
   ipcMain.handle('set-draft-ttl-days', (_event, days: number) => {
-    if (![1, 2, 3, 7].includes(Number(days))) return false
+    if (![1, 2, 3, 7, 30, 365].includes(Number(days))) return false
     const config = loadConfig()
     config.draftTtlDays = Number(days)
     saveConfig(config)
+
+    // v1.2.0 #6：当 TTL 改变时，重新计算所有现有草稿的 expiresAt
+    // 问题：用户从3天改成1年后，已有草稿的 expiresAt 仍为 createdAt + 3天，3天后仍会被清除
+    // 修复：遍历所有草稿，根据其 createdAt 重新计算 expiresAt = createdAt + newTtl
+    // 同时更新笔记文件和索引，确保 cleanupExpiredNotes 和 isExpiringSoon 都基于一致的 expiresAt
+    const newTtlMs = getDraftTtlMs(Number(days))
+    const index = loadNoteIndex()
+    let updated = false
+    for (const entry of index) {
+      if (entry.type !== 'draft') continue
+      try {
+        const notePath = path.join(notesDir, `${entry.id}.json`)
+        if (!fs.existsSync(notePath)) continue
+        const note: Note = JSON.parse(fs.readFileSync(notePath, 'utf-8'))
+        if (!note.createdAt) continue
+        const newExpiresAt = new Date(new Date(note.createdAt).getTime() + newTtlMs).toISOString()
+        note.expiresAt = newExpiresAt
+        fs.writeFileSync(notePath, JSON.stringify(note, null, 2))
+        entry.expiresAt = newExpiresAt
+        updated = true
+      } catch (e) {
+        console.error(`更新草稿 ${entry.id} 的 expiresAt 失败:`, e)
+      }
+    }
+    if (updated) {
+      saveNoteIndex(index)
+      console.log(`TTL 变更为 ${days} 天，已更新所有草稿的 expiresAt`)
+    }
+
     return true
   })
 
@@ -1948,6 +2106,87 @@ app.whenReady().then(() => {
     else if (mode === 'enter') config.seqAcceptOnEnter = enabled === true
     saveConfig(config)
     return true
+  })
+
+  // v1.2.0 P0-A：链接点击行为设置（direct=直接打开，ask=弹窗询问）
+  ipcMain.handle('set-link-click-behavior', (_event, behavior: string) => {
+    const config = loadConfig()
+    config.linkClickBehavior = behavior === 'ask' ? 'ask' : 'direct'
+    saveConfig(config)
+    return true
+  })
+
+  // v1.2.0 P0-B：获取可选文件关联分组列表及当前启用状态
+  ipcMain.handle('get-file-association-groups', async () => {
+    const config = loadConfig()
+    const enabledGroups = config.fileAssociationGroups || []
+    return FILE_ASSOCIATION_GROUPS.map(g => ({
+      id: g.id,
+      name: g.name,
+      description: g.description,
+      exts: g.exts,
+      enabled: enabledGroups.includes(g.id),
+    }))
+  })
+
+  // v1.2.0 P0-B：设置文件关联分组（动态注册/注销 Windows 注册表）
+  // 仅 Windows 平台支持；开发模式下跳过注册表操作（exePath 指向 electron.exe 而非 OncePad.exe）
+  ipcMain.handle('set-file-association-group', async (_event, groupId: string, enabled: boolean) => {
+    if (process.platform !== 'win32') {
+      return { success: false, error: '仅支持 Windows 平台' }
+    }
+    const group = FILE_ASSOCIATION_GROUPS.find(g => g.id === groupId)
+    if (!group) {
+      return { success: false, error: `未知的文件关联分组: ${groupId}` }
+    }
+
+    // 开发模式下跳过注册表操作（process.execPath 指向 electron.exe）
+    const isDev = !!VITE_DEV_SERVER_URL
+    if (isDev) {
+      // 仍然更新 config，以便用户在打包版中看到设置生效
+      const config = loadConfig()
+      const groups = new Set(config.fileAssociationGroups || [])
+      if (enabled) groups.add(groupId)
+      else groups.delete(groupId)
+      config.fileAssociationGroups = Array.from(groups)
+      saveConfig(config)
+      return { success: true, dev: true }
+    }
+
+    const exePath = process.execPath
+    try {
+      for (const ext of group.exts) {
+        if (enabled) {
+          // 注册关联：HKCU\Software\Classes\.ext → ProgID
+          await execAsync(`reg add "HKCU\\Software\\Classes\\.${ext}" /ve /d "${group.progId}" /f`)
+          // 注册 ProgID
+          await execAsync(`reg add "HKCU\\Software\\Classes\\${group.progId}" /ve /d "${group.name} 文件" /f`)
+          await execAsync(`reg add "HKCU\\Software\\Classes\\${group.progId}\\DefaultIcon" /ve /d "${exePath},0" /f`)
+          await execAsync(`reg add "HKCU\\Software\\Classes\\${group.progId}\\shell\\open\\command" /ve /d "\\"${exePath}\\" \\"%1\\"" /f`)
+        } else {
+          // 注销关联：仅当关联值指向当前 ProgID 时才删除（避免删除其他程序的关联）
+          try {
+            const output = await execAsync(`reg query "HKCU\\Software\\Classes\\.${ext}" /ve`)
+            if (output.includes(group.progId)) {
+              await execAsync(`reg delete "HKCU\\Software\\Classes\\.${ext}" /f`)
+            }
+          } catch {
+            // reg query 失败表示键不存在，无需删除
+          }
+        }
+      }
+      // 更新 config 持久化
+      const config = loadConfig()
+      const groups = new Set(config.fileAssociationGroups || [])
+      if (enabled) groups.add(groupId)
+      else groups.delete(groupId)
+      config.fileAssociationGroups = Array.from(groups)
+      saveConfig(config)
+      return { success: true }
+    } catch (err) {
+      writeErrorLog('ERROR', `set-file-association-group failed (group=${groupId}, enabled=${enabled}): ${err}`)
+      return { success: false, error: String(err) }
+    }
   })
 
   // 设置导航栏按钮显示/隐藏
@@ -2283,8 +2522,23 @@ app.whenReady().then(() => {
   })
 
   // v1.1.0：使用系统默认浏览器打开外部链接（避免在 Electron 内部打开）
+  // v1.2.0 P0-A Layer 4：扩展协议白名单，支持 http/https/mailto/ftp
+  //   拒绝 file://（防止读取本地文件）、javascript:（防止 XSS）、data:（防止数据 URL 攻击）
   ipcMain.handle('open-external', async (_event, url: string) => {
-    if (typeof url !== 'string' || !url.startsWith('https://')) return false
+    if (typeof url !== 'string' || url.length === 0) return false
+    // 协议白名单校验
+    const allowedProtocols = ['https:', 'http:', 'mailto:', 'ftp:']
+    let parsedUrl: URL
+    try {
+      parsedUrl = new URL(url)
+    } catch {
+      writeErrorLog('WARN', `open-external rejected invalid URL: ${url}`)
+      return false
+    }
+    if (!allowedProtocols.includes(parsedUrl.protocol)) {
+      writeErrorLog('WARN', `open-external rejected protocol "${parsedUrl.protocol}": ${url}`)
+      return false
+    }
     await shell.openExternal(url)
     return true
   })
@@ -2300,6 +2554,19 @@ app.whenReady().then(() => {
       return true
     } catch (err) {
       writeErrorLog('ERROR', `Failed to open logs folder: ${err}`)
+      return false
+    }
+  })
+
+  // v1.2.0 #7：在系统文件资源管理器中显示指定文件所在文件夹（高亮选中文件）
+  // 仅在文件模式下可用，调用 Electron shell.showItemInFolder API
+  ipcMain.handle('show-file-in-folder', (_event, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath) return false
+    try {
+      shell.showItemInFolder(filePath)
+      return true
+    } catch (err) {
+      writeErrorLog('ERROR', `Failed to show file in folder: ${err}`)
       return false
     }
   })

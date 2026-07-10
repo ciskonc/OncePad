@@ -16,6 +16,7 @@
     "fileSave": "Save",
     "fileSaveAs": "Save As...",
     "fileClose": "Close File",
+    "fileShowInFolder": "Show in Folder",
     "about": "About {{name}}"
   },
   "editor": {
@@ -32,7 +33,8 @@
     "words": "{{count}} words",
     "chars": "{{count}} chars",
     "lines": "{{count}} lines",
-    "outline": "Outline"
+    "outline": "Outline",
+    "linkOpenConfirm": "Open this link in the system default browser?"
   },
   "notes": {
     "title": "Notes",
@@ -145,6 +147,8 @@
     "draftTtl2Days": "2 days",
     "draftTtl3Days": "3 days (recommended)",
     "draftTtl1Week": "1 week",
+    "draftTtl1Month": "1 Month",
+    "draftTtl1Year": "1 Year",
     "autoLaunch": "Launch at startup",
     "autoLaunchDesc": "Automatically launch OncePad when the system starts",
     "autoLaunchHidden": "Start hidden in background",
@@ -224,7 +228,17 @@
     "showMinimap": "Minimap",
     "experimental": "Experimental",
     "showMinimapDesc": "Display a document minimap on the right side of the editor for quick navigation",
-    "showMinimapWarning": "This feature is still under development. Minimap positioning may be inaccurate. Will be improved in future versions."
+    "showMinimapWarning": "This feature is still under development. Minimap positioning may be inaccurate. Will be improved in future versions.",
+    "linkClickBehavior": "Link Click Behavior",
+    "linkClickBehaviorDesc": "Choose how links in the Markdown preview area are opened",
+    "linkClickDirect": "Open directly in system browser (recommended)",
+    "linkClickAsk": "Ask before opening",
+    "tabFileAssociation": "File Associations",
+    "fileAssociationTitle": "File Association Management",
+    "fileAssociationDesc": "Manage which file types OncePad handles. Markdown and plain text are associated by default; others can be enabled manually.",
+    "fileAssociationDefault": "Default associations (enabled)",
+    "fileAssociationBatNote": "About .bat / .cmd files",
+    "fileAssociationBatNoteDesc": "OncePad will never take over .bat / .cmd file associations to ensure developers can use batch scripts normally. To edit .bat files in OncePad, right-click and choose \"Open with\"."
   },
   "about": {
     "description": "A lightweight, instant-access scratchpad — every piece of scattered text finds its place",

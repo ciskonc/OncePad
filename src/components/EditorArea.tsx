@@ -59,6 +59,8 @@ interface EditorAreaProps {
   toastMessage: string | null
   // v1.1.2 修复 Bug M-5：minimap 诊断日志受 debugMode 控制，生产环境不写入
   debugMode: boolean
+  // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
+  linkClickBehavior: 'direct' | 'ask'
 }
 
 export function EditorArea(props: EditorAreaProps) {
@@ -95,6 +97,7 @@ export function EditorArea(props: EditorAreaProps) {
     onToggleEditorMode,
     onJumpToLine,
     debugMode,
+    linkClickBehavior,
   } = props
 
   // 行号栏 ref：用于与 textarea 同步滚动
@@ -1112,12 +1115,36 @@ export function EditorArea(props: EditorAreaProps) {
           </div>
         )}
 
-        {/* MD 预览区：阅读模式下显示渲染后的 HTML */}
+        {/* MD 预览区：阅读模式下显示渲染后的 HTML
+            v1.2.0 P0-A Layer 3：拦截 <a> 链接点击，走 openExternal 系统浏览器
+            根因：Electron 默认在当前窗口内导航加载网页，无返回按钮导致卡死 */}
         {editorMode === 'preview' && (
           <div
             ref={previewRef}
             className="editor md-preview"
             dangerouslySetInnerHTML={{ __html: renderedHtml }}
+            onClick={(e) => {
+              // 检测点击目标是否为 <a> 标签或其子元素
+              const target = e.target as HTMLElement
+              const anchor = target.closest('a')
+              if (!anchor) return
+              const href = anchor.getAttribute('href')
+              if (!href) return
+              // 阻止默认导航行为（Electron 默认在窗口内加载）
+              e.preventDefault()
+              e.stopPropagation()
+              // 根据用户设置决定行为
+              if (linkClickBehavior === 'ask') {
+                // 弹窗询问模式
+                const confirmed = window.confirm(
+                  `${t('editor.linkOpenConfirm', '是否使用系统浏览器打开此链接？')}\n${href}`
+                )
+                if (!confirmed) return
+              }
+              // 调用主进程 openExternal 走系统浏览器
+              // 协议白名单由主进程 open-external handler 校验
+              window.electronAPI.openExternal(href)
+            }}
           />
         )}
 

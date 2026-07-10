@@ -16,6 +16,7 @@
     "fileSave": "保存",
     "fileSaveAs": "名前を付けて保存...",
     "fileClose": "ファイルを閉じる",
+    "fileShowInFolder": "ファイルの場所を開く",
     "about": "{{name}} について"
   },
   "editor": {
@@ -32,7 +33,8 @@
     "words": "{{count}} 単語",
     "chars": "{{count}} 文字",
     "lines": "{{count}} 行",
-    "outline": "アウトライン"
+    "outline": "アウトライン",
+    "linkOpenConfirm": "システムのデフォルトブラウザでこのリンクを開きますか？"
   },
   "notes": {
     "title": "メモ",
@@ -145,6 +147,8 @@
     "draftTtl2Days": "2日",
     "draftTtl3Days": "3日（推奨）",
     "draftTtl1Week": "1週間",
+    "draftTtl1Month": "1 か月",
+    "draftTtl1Year": "1 年",
     "autoLaunch": "スタートアップで起動",
     "autoLaunchDesc": "システム起動時にOncePadを自動的に起動します",
     "autoLaunchHidden": "バックグラウンドで非表示起動",
@@ -224,7 +228,17 @@
     "showMinimap": "ミニマップ",
     "experimental": "実験的",
     "showMinimapDesc": "エディタの右側にドキュメントのミニマップを表示し、素早く移動できます",
-    "showMinimapWarning": "この機能はまだ開発中です。ミニマップの位置が不正確な場合があります。将来のバージョンで改善されます。"
+    "showMinimapWarning": "この機能はまだ開発中です。ミニマップの位置が不正確な場合があります。将来のバージョンで改善されます。",
+    "linkClickBehavior": "リンククリック動作",
+    "linkClickBehaviorDesc": "Markdown プレビュー領域のリンクをクリックした際の開き方を選択",
+    "linkClickDirect": "システムブラウザで直接開く（推奨）",
+    "linkClickAsk": "開く前に確認する",
+    "tabFileAssociation": "ファイル関連付け",
+    "fileAssociationTitle": "ファイル関連付け管理",
+    "fileAssociationDesc": "OncePad が処理するファイルタイプを管理します。Markdown とプレーンテキストはデフォルトで関連付けられ、その他は手動で有効化できます。",
+    "fileAssociationDefault": "デフォルト関連付け（有効）",
+    "fileAssociationBatNote": ".bat / .cmd ファイルについて",
+    "fileAssociationBatNoteDesc": "OncePad は .bat / .cmd ファイルの関連付けを引き継ぐことはありません。バッチスクリプトの正常な使用を保証するためです。OncePad で .bat ファイルを編集するには、右クリックして「プログラムから開く」を選択してください。"
   },
   "about": {
     "description": "軽量でいつでも呼び出せる一時ノート",

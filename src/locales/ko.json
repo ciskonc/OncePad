@@ -16,6 +16,7 @@
     "fileSave": "저장",
     "fileSaveAs": "다른 이름으로 저장...",
     "fileClose": "파일 닫기",
+    "fileShowInFolder": "파일 위치 열기",
     "about": "{{name}} 정보"
   },
   "editor": {
@@ -32,7 +33,8 @@
     "words": "{{count}}단어",
     "chars": "{{count}}자",
     "lines": "{{count}}줄",
-    "outline": "개요"
+    "outline": "개요",
+    "linkOpenConfirm": "시스템 기본 브라우저로 이 링크를 여시겠습니까?"
   },
   "notes": {
     "title": "메모",
@@ -145,6 +147,8 @@
     "draftTtl2Days": "2일",
     "draftTtl3Days": "3일 (권장)",
     "draftTtl1Week": "1주일",
+    "draftTtl1Month": "1 개월",
+    "draftTtl1Year": "1 년",
     "autoLaunch": "시작 시 실행",
     "autoLaunchDesc": "시스템 시작 시 OncePad를 자동으로 실행합니다",
     "autoLaunchHidden": "백그라운드에서 숨김 상태로 시작",
@@ -224,7 +228,17 @@
     "showMinimap": "미니맵",
     "experimental": "실험적",
     "showMinimapDesc": "편집기 우측에 문서 미니맵을 표시하여 빠른 탐색을 돕습니다",
-    "showMinimapWarning": "이 기능은 아직 개발 중입니다. 미니맵 위치가 부정확할 수 있습니다. 향후 버전에서 개선될 예정입니다."
+    "showMinimapWarning": "이 기능은 아직 개발 중입니다. 미니맵 위치가 부정확할 수 있습니다. 향후 버전에서 개선될 예정입니다.",
+    "linkClickBehavior": "링크 클릭 동작",
+    "linkClickBehaviorDesc": "Markdown 미리보기 영역의 링크를 클릭할 때 열 방법 선택",
+    "linkClickDirect": "시스템 브라우저로 바로 열기 (권장)",
+    "linkClickAsk": "열기 전에 확인",
+    "tabFileAssociation": "파일 연결",
+    "fileAssociationTitle": "파일 연결 관리",
+    "fileAssociationDesc": "OncePad가 처리할 파일 형식을 관리합니다. Markdown과 일반 텍스트는 기본적으로 연결되며, 기타 형식은 수동으로 활성화할 수 있습니다.",
+    "fileAssociationDefault": "기본 연결 (활성화됨)",
+    "fileAssociationBatNote": ".bat / .cmd 파일에 대하여",
+    "fileAssociationBatNoteDesc": "OncePad는 개발자가 배치 스크립트를 정상적으로 사용할 수 있도록 .bat / .cmd 파일 연결을 절대 가져오지 않습니다. OncePad로 .bat 파일을 편집하려면 마우스 오른쪽 버튼 클릭 후 \"연결 프로그램\"을 선택하세요."
   },
   "about": {
     "description": "언제든 불러올 수 있는 가벼운 임시 노트",

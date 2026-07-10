@@ -10,11 +10,9 @@
 
 按下全局快捷键唤出，输入文字，再按一次——内容已复制到剪贴板，随时粘贴到任何地方。
 
-[🌐 官网](https://oncepad.magicalyu.online/) · [📥 下载](https://github.com/MagicalYuYu/OncePad/releases) · [🚀 功能](#它能做什么)
-
-![Version](https://img.shields.io/badge/version-1.1.3-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.2.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-success?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)
 ![Languages](https://img.shields.io/badge/i18n-11%20languages-blueviolet?style=flat-square)
 
 </div>
@@ -39,7 +37,11 @@
 - 📄 **广泛格式支持** — 可打开任意纯文本文件，即使后缀名不常见（基于内容检测）
 - 👁️ **MD 默认浏览** — Markdown 文件默认以阅读模式打开，其他格式默认编辑模式
 - 💾 **保存反馈** — Ctrl+S 保存成功后弹出 toast 视觉确认
+- 🚪 **可靠关闭** — 强制关闭机制，修复关闭 Markdown 文件时程序卡死的问题
+- ⚡ **快速打开** — 资源管理器双击文件时复用已有窗口，避免新进程启动开销
+- 📋 **异常日志** — 程序崩溃/卡死日志存储在固定路径，设置→管理→高级中可快速跳转
 - 🔗 **广泛文件关联** — 注册为 40+ 种文件类型的默认编辑器（.md / .txt / .js / .py / .json / .csv / .sh / .html / .css 等）
+- ℹ️ **关于对话框** — 查看应用版本和系统信息，附 GitHub 仓库快捷链接
 - 🌐 **11 种语言** — 简体中文 / 繁體中文 / English / 日本語 / 한국어 / Deutsch / Français / Español / Português (Brasil) / Русский / Italiano
 - 🎛️ **导航栏自定义** — 显示/隐藏标题栏按钮（收藏/颜色/新建/复制/笔记）
 - 🔤 **字体定制** — 中英文字体分离，可调字号、行高、内边距

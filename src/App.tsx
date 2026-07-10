@@ -5,8 +5,9 @@ import './i18n'
 import type { Note, NoteIndexEntry, NoteColor, NoteType, NoteFormat, Workspace, Tag, NoteQuery, TrashNoteEntry, AppInfo } from './types'
 import { renderMarkdown, detectMarkdownSyntax } from './lib/markdown'
 import { matchShortcut, formatShortcut, detectShortcutConflict } from './lib/shortcuts'
-import { sortNotes, isExpiringSoon, DRAFT_TTL_MS, type SortBy } from './lib/notes'
+import { sortNotes, isExpiringSoon, getDraftTtlMs, type SortBy } from './lib/notes'
 import { DEFAULT_TOGGLE_SHORTCUT, DEFAULT_NEW_SHORTCUT, DEFAULT_COPY_SHORTCUT, NOTE_COLORS, COLOR_HEX } from './lib/constants'
+import { normalizeFontName } from './lib/format'
 import { useAutoSave } from './hooks/useAutoSave'
 import { SettingsPanel, type SettingsTab, type ShortcutTarget } from './components/SettingsPanel'
 import { NotesPanel, type NoteFilter } from './components/NotesPanel'
@@ -98,6 +99,10 @@ function App() {
   // v1.1.0：序号补全接受方式（方案 B：仅 Tab/Enter，移除"继续输入即接受"）
   const [seqAcceptOnTab, setSeqAcceptOnTab] = useState(true)
   const [seqAcceptOnEnter, setSeqAcceptOnEnter] = useState(false)
+  // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
+  const [linkClickBehavior, setLinkClickBehavior] = useState<'direct' | 'ask'>('direct')
+  // v1.2.0 P0-B：可选文件关联分组列表（用户在设置面板中手动开启/关闭）
+  const [fileAssociationGroups, setFileAssociationGroups] = useState<Array<{ id: string; name: string; description: string; exts: string[]; enabled: boolean }>>([])
   // v1.1.0：文件菜单下拉
   const [showFileMenu, setShowFileMenu] = useState(false)
   // v1.1.0：关于对话框
@@ -214,10 +219,15 @@ function App() {
   }, [theme])
 
   // 动态应用字体：根据 fontSplit 开关选择统一字体或分离字体
+  // v1.2.0 #5：使用 normalizeFontName 去除字体名首尾引号，避免 CSS 双重引号解析失败
   useEffect(() => {
     const root = document.documentElement
     const styleId = 'oncepad-font-face'
     let style = document.getElementById(styleId) as HTMLStyleElement | null
+
+    // 规范化字体名：去除 font-list 返回的首尾引号
+    const enFont = normalizeFontName(fontEn)
+    const cnFont = normalizeFontName(fontCn)
 
     if (fontSplit) {
       if (!style) {
@@ -228,12 +238,12 @@ function App() {
       style.textContent = `
         @font-face {
           font-family: 'OncePadEditor';
-          src: local('${fontEn}');
+          src: local('${enFont}');
           unicode-range: U+0000-007F, U+00A0-00FF, U+2000-206F, U+2E00-2E7F, U+1E00-1EFF;
         }
         @font-face {
           font-family: 'OncePadEditor';
-          src: local('${fontCn}');
+          src: local('${cnFont}');
           unicode-range: U+3000-303F, U+4E00-9FFF, U+FF00-FFEF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+3040-309F, U+30A0-30FF, U+AC00-D7AF;
         }
       `
@@ -242,7 +252,7 @@ function App() {
       if (style) {
         style.textContent = ''
       }
-      root.style.setProperty('--editor-font', `'${fontCn}', sans-serif`)
+      root.style.setProperty('--editor-font', `'${cnFont}', sans-serif`)
     }
 
     root.style.setProperty('--editor-font-size', `${fontSize}px`)
@@ -291,6 +301,10 @@ function App() {
       // v1.1.0：序号补全接受方式（方案 B：仅 Tab/Enter）
       setSeqAcceptOnTab(config.seqAcceptOnTab !== false)
       setSeqAcceptOnEnter(config.seqAcceptOnEnter === true)
+      // v1.2.0 P0-A：链接点击行为（默认 direct 直接打开）
+      setLinkClickBehavior(config.linkClickBehavior === 'ask' ? 'ask' : 'direct')
+      // v1.2.0 P0-B：加载可选文件关联分组（从主进程读取注册表当前状态）
+      window.electronAPI.getFileAssociationGroups().then(setFileAssociationGroups)
       // 导航栏按钮配置（兼容旧配置，缺失字段默认 true）
       setNavbarButtons({
         pin: config.navbarButtons?.pin !== false,
@@ -446,7 +460,7 @@ function App() {
       workspace: noteWorkspace,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + DRAFT_TTL_MS).toISOString(),
+      expiresAt: new Date(now.getTime() + getDraftTtlMs(draftTtlDays)).toISOString(),
       format: editorFormat,
     }
     await window.electronAPI.saveNote(newNote)
@@ -486,7 +500,7 @@ function App() {
         workspace: noteWorkspace,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-        expiresAt: new Date(now.getTime() + DRAFT_TTL_MS).toISOString(),
+        expiresAt: new Date(now.getTime() + getDraftTtlMs(draftTtlDays)).toISOString(),
         format: editorFormat,
       }
       await window.electronAPI.saveNote(newNote)
@@ -503,6 +517,7 @@ function App() {
     currentNote,
     selectedWorkspaceId,
     editorFormat,
+    draftTtlDays,
     saveCurrentNote,
   })
 
@@ -703,7 +718,7 @@ function App() {
         const updated: Note = {
           ...note,
           type: 'draft',
-          expiresAt: new Date(now.getTime() + DRAFT_TTL_MS).toISOString(),
+          expiresAt: new Date(now.getTime() + getDraftTtlMs(draftTtlDays)).toISOString(),
           updatedAt: now.toISOString(),
           pinned: undefined,
         }
@@ -1251,6 +1266,24 @@ function App() {
     if (mode === 'tab') setSeqAcceptOnTab(enabled)
     else if (mode === 'enter') setSeqAcceptOnEnter(enabled)
     window.electronAPI.setSeqAcceptMode(mode, enabled)
+  }, [])
+
+  // v1.2.0 P0-A：链接点击行为变更
+  const handleLinkClickBehaviorChange = useCallback((behavior: 'direct' | 'ask') => {
+    setLinkClickBehavior(behavior)
+    window.electronAPI.setLinkClickBehavior(behavior)
+  }, [])
+
+  // v1.2.0 P0-B：文件关联分组切换（乐观更新 + 失败回滚）
+  const handleFileAssociationGroupChange = useCallback((groupId: string, enabled: boolean) => {
+    setFileAssociationGroups(prev => prev.map(g => g.id === groupId ? { ...g, enabled } : g))
+    window.electronAPI.setFileAssociationGroup(groupId, enabled).then((result) => {
+      if (!result.success) {
+        // 失败时回滚状态
+        setFileAssociationGroups(prev => prev.map(g => g.id === groupId ? { ...g, enabled: !enabled } : g))
+        alert(`设置文件关联失败: ${result.error || '未知错误'}`)
+      }
+    })
   }, [])
 
   // 调试模式开关（提取自 SettingsPanel JSX 内联 onChange）
@@ -2017,6 +2050,11 @@ function App() {
                       {t('titlebar.fileClose', '关闭文件')}
                     </button>
                   )}
+                  {fileInfo && (
+                    <button className="context-menu-item" onClick={() => { setShowFileMenu(false); window.electronAPI.showFileInFolder(fileInfo.filePath) }}>
+                      {t('titlebar.fileShowInFolder', '跳转文件所在文件夹')}
+                    </button>
+                  )}
                   <div className="context-menu-separator" />
                   <button className="context-menu-item" onClick={() => { setShowFileMenu(false); handleAbout() }}>
                     {t('titlebar.about', '关于 {{name}}', { name: 'OncePad' })}
@@ -2221,6 +2259,7 @@ function App() {
           seqAcceptOnTab={seqAcceptOnTab}
           seqAcceptOnEnter={seqAcceptOnEnter}
           debugMode={debugMode}
+          linkClickBehavior={linkClickBehavior}
         />
 
         {/* 笔记面板 — 拆分为独立组件 NotesPanel，所有 state/handlers 通过 props 传入 */}
@@ -2360,6 +2399,10 @@ function App() {
             seqAcceptOnTab={seqAcceptOnTab}
             seqAcceptOnEnter={seqAcceptOnEnter}
             onSeqAcceptModeChange={handleSeqAcceptModeChange}
+            linkClickBehavior={linkClickBehavior}
+            onLinkClickBehaviorChange={handleLinkClickBehaviorChange}
+            fileAssociationGroups={fileAssociationGroups}
+            onFileAssociationGroupChange={handleFileAssociationGroupChange}
             workspaces={workspaces}
             tags={tags}
             defaultWorkspaceId={defaultWorkspaceId}

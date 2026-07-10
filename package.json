@@ -1,6 +1,6 @@
 {
   "name": "oncepad",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "description": "OncePad - A lightweight, always-available scratchpad for drafting messages, AI prompts, and quick notes",
   "author": "OncePad Contributors",
   "license": "GPL-3.0",
@@ -11,9 +11,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "start": "electron .",
-    "dist": "npm run build && electron-builder",
-    "build:win": "electron-builder --win",
-    "build:dir": "electron-builder --dir"
+    "dist": "npm run build && electron-builder --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:dir": "electron-builder --dir --publish never"
   },
   "build": {
     "appId": "com.oncepad.app",
@@ -48,7 +48,8 @@
       "shortcutName": "OncePad",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "include": "build/installer.nsh"
     },
     "fileAssociations": [
       {
@@ -66,58 +67,9 @@
         "role": "Editor"
       },
       {
-        "ext": ["js", "ts", "jsx", "tsx", "mjs", "cjs"],
-        "name": "OncePad.JavaScript",
-        "description": "JavaScript/TypeScript 文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["py", "rb", "php", "java", "c", "cpp", "h", "hpp", "cs", "go", "rs", "swift", "kt", "scala", "clj", "ex", "exs"],
-        "name": "OncePad.SourceCode",
-        "description": "源代码文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["html", "htm", "xml", "svg", "vue", "svelte"],
-        "name": "OncePad.WebMarkup",
-        "description": "Web 标记文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["css", "scss", "sass", "less"],
-        "name": "OncePad.Stylesheet",
-        "description": "样式表文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["json", "yml", "yaml", "toml", "ini", "conf", "cfg", "properties"],
+        "ext": ["json", "yml", "yaml"],
         "name": "OncePad.Config",
         "description": "配置文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["csv", "tsv", "sql"],
-        "name": "OncePad.Data",
-        "description": "数据文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["sh", "bash", "zsh", "fish", "ps1", "bat", "cmd"],
-        "name": "OncePad.ShellScript",
-        "description": "脚本文件",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": ["diff", "patch"],
-        "name": "OncePad.Diff",
-        "description": "差异文件",
         "icon": "build/icon.ico",
         "role": "Editor"
       }

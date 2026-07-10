@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Note, NoteFormat } from '../types'
-import { DRAFT_TTL_MS } from '../lib/notes'
+import { getDraftTtlMs } from '../lib/notes'
 
 interface FileInfo {
   filePath: string
@@ -13,6 +13,7 @@ interface UseAutoSaveParams {
   currentNote: Note | null
   selectedWorkspaceId: string
   editorFormat: NoteFormat
+  draftTtlDays: number
   saveCurrentNote: () => Promise<void>
 }
 
@@ -28,6 +29,7 @@ export function useAutoSave({
   currentNote,
   selectedWorkspaceId,
   editorFormat,
+  draftTtlDays,
   saveCurrentNote,
 }: UseAutoSaveParams) {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -90,7 +92,7 @@ export function useAutoSave({
             workspace: selectedWorkspaceId,
             createdAt: now.toISOString(),
             updatedAt: now.toISOString(),
-            expiresAt: new Date(now.getTime() + DRAFT_TTL_MS).toISOString(),
+            expiresAt: new Date(now.getTime() + getDraftTtlMs(draftTtlDays)).toISOString(),
             format: editorFormat,
           }
           window.electronAPI.saveNoteSync(newNote)
@@ -99,7 +101,7 @@ export function useAutoSave({
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [text, currentNote, fileInfo, selectedWorkspaceId, editorFormat])
+  }, [text, currentNote, fileInfo, selectedWorkspaceId, editorFormat, draftTtlDays])
 
   // 组件卸载时清理定时器
   useEffect(() => {

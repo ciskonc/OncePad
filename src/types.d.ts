@@ -141,6 +141,10 @@ export interface AppConfig {
   // v1.1.0：序号补全接受方式（方案 B：仅 Tab/Enter，移除"继续输入即接受"）
   seqAcceptOnTab?: boolean
   seqAcceptOnEnter?: boolean
+  // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
+  linkClickBehavior?: 'direct' | 'ask'
+  // v1.2.0 P0-B：已启用的文件关联分组 ID 列表（动态注册到注册表）
+  fileAssociationGroups?: string[]
 }
 
 // ===== 回收站条目类型（回收站机制新增） =====
@@ -209,6 +213,12 @@ export interface ElectronAPI {
   setEnableSequenceSuggestion: (enabled: boolean) => Promise<boolean>
   // v1.1.0：序号补全接受方式（key: seqAcceptOnTab / seqAcceptOnEnter）
   setSeqAcceptMode: (key: string, enabled: boolean) => Promise<boolean>
+  // v1.2.0 P0-A：链接点击行为设置（direct=直接打开，ask=弹窗询问）
+  setLinkClickBehavior: (behavior: 'direct' | 'ask') => Promise<boolean>
+  // v1.2.0 P0-B：获取可选文件关联分组列表及当前启用状态
+  getFileAssociationGroups: () => Promise<Array<{ id: string; name: string; description: string; exts: string[]; enabled: boolean }>>
+  // v1.2.0 P0-B：设置文件关联分组（动态注册/注销 Windows 注册表）
+  setFileAssociationGroup: (groupId: string, enabled: boolean) => Promise<{ success: boolean; error?: string; dev?: boolean }>
   // 导航栏按钮配置
   navbarButtons?: {
     pin: boolean
@@ -269,6 +279,8 @@ export interface ElectronAPI {
   onLoadFileInWindow: (callback: (filePath: string) => void) => () => void
   // v1.1.1：打开日志文件夹（设置界面入口）
   openLogsFolder: () => Promise<boolean>
+  // v1.2.0 #7：在系统资源管理器中显示文件所在文件夹（高亮选中文件）
+  showFileInFolder: (filePath: string) => Promise<boolean>
   // v1.1.1：获取日志存储路径（设置界面显示）
   getLogsPath: () => Promise<string>
   // v1.1.1：渲染进程写入错误日志（window.onerror 捕获后发送）
