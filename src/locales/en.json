@@ -250,5 +250,21 @@
     "save": "Save",
     "discard": "Don't Save",
     "cancel": "Cancel"
+  },
+  "search": {
+    "placeholder": "Search...",
+    "replacePlaceholder": "Replace with...",
+    "caseSensitive": "Case sensitive",
+    "wholeWord": "Whole word",
+    "regex": "Regular expression",
+    "next": "Next",
+    "prev": "Previous",
+    "replace": "Replace",
+    "replaceAll": "Replace All",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "No match",
+    "close": "Close",
+    "regexError": "Regex error: {{message}}",
+    "replacedCount": "Replaced {{count}} occurrence(s)"
   }
 }

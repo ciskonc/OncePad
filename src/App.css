@@ -2263,6 +2263,202 @@ body {
   transition: background 0.3s ease;
 }
 
+/* ===== v1.3.0 搜索替换功能样式 ===== */
+
+/* overlay 高亮层：位于 textarea 下方，pointer-events: none 不拦截鼠标 */
+.editor-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  color: transparent;
+  background: transparent;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  /* 隐藏滚动条（滚动由 textarea 控制，通过 handleGutterSync 同步） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.editor-overlay::-webkit-scrollbar {
+  display: none;
+}
+
+/* 编辑器 textarea 透明文字 + 可见光标（搜索激活时添加 with-search class） */
+.editor.with-search {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  position: relative;
+  z-index: 2;
+}
+
+/* 搜索匹配高亮（半透明黄色） */
+.search-match {
+  background: rgba(255, 235, 59, 0.4);
+  border-radius: 2px;
+  color: transparent;
+}
+
+/* 当前匹配高亮（半透明橙色 + 边框） */
+.search-match-current {
+  background: rgba(255, 152, 0, 0.6);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.8);
+  color: transparent;
+}
+
+/* 搜索替换面板：右上角悬浮 */
+.search-replace-panel {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  z-index: 100;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 380px;
+}
+
+/* 面板行布局：输入框 + 按钮 + 计数 */
+.search-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 搜索/替换输入框 */
+.search-input,
+.replace-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.search-input:focus,
+.replace-input:focus {
+  border-color: var(--accent);
+}
+
+/* 选项按钮（Aa/W/.*） */
+.search-option-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: monospace;
+  min-width: 28px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.search-option-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.search-option-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+/* 导航按钮（▲/▼） */
+.search-nav-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  min-width: 28px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.search-nav-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.search-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 替换/全部替换按钮 */
+.search-action-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+.search-action-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.search-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 关闭按钮 */
+.search-close-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+.search-close-btn:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+/* 匹配计数显示 */
+.search-match-count {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  min-width: 50px;
+  text-align: center;
+  user-select: none;
+}
+
+/* 正则错误提示 */
+.search-error {
+  color: var(--danger, #e06c75);
+  font-size: 11px;
+  padding: 2px 4px;
+  word-break: break-all;
+}
+
 /* 预览区高亮带：切换模式时短暂显示的半透明指示条 */
 .md-highlight-band {
   position: absolute;

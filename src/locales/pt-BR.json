@@ -250,5 +250,21 @@
     "save": "Salvar",
     "discard": "Não salvar",
     "cancel": "Cancelar"
+  },
+  "search": {
+    "placeholder": "Pesquisar...",
+    "replacePlaceholder": "Substituir por...",
+    "caseSensitive": "Diferenciar maiúsculas",
+    "wholeWord": "Palavra inteira",
+    "regex": "Expressão regular",
+    "next": "Próximo",
+    "prev": "Anterior",
+    "replace": "Substituir",
+    "replaceAll": "Substituir tudo",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "Sem resultados",
+    "close": "Fechar",
+    "regexError": "Erro de regex: {{message}}",
+    "replacedCount": "{{count}} ocorrência(s) substituída(s)"
   }
 }

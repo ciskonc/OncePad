@@ -3,6 +3,7 @@ import { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } fr
 import { useTranslation } from 'react-i18next'
 import type { NoteFormat } from '../types'
 import { parseListPrefix, nextListPrefix } from '../lib/sequence'
+import type { Match } from '../hooks/useSearchReplace'
 
 // 大纲项：标题级别 + 文本 + 所在行号
 export type OutlineItem = { level: number; text: string; line: number }
@@ -61,6 +62,11 @@ interface EditorAreaProps {
   debugMode: boolean
   // v1.2.0 P0-A：链接点击行为（direct=直接系统浏览器打开，ask=弹窗询问）
   linkClickBehavior: 'direct' | 'ask'
+  // 搜索替换功能（v1.3.0）：overlay 高亮层 ref + 搜索状态
+  overlayRef: RefObject<HTMLDivElement>
+  searchMatches: Match[]
+  searchCurrentIndex: number
+  searchIsActive: boolean
 }
 
 export function EditorArea(props: EditorAreaProps) {
@@ -98,6 +104,10 @@ export function EditorArea(props: EditorAreaProps) {
     onJumpToLine,
     debugMode,
     linkClickBehavior,
+    overlayRef,
+    searchMatches,
+    searchCurrentIndex,
+    searchIsActive,
   } = props
 
   // 行号栏 ref：用于与 textarea 同步滚动
@@ -878,10 +888,15 @@ export function EditorArea(props: EditorAreaProps) {
     setMinimapViewport({ top: topPercent, height: heightPercent })
   }
 
-  // textarea 滚动时同步行号栏滚动位置 + 更新 minimap 视口指示器
+  // textarea 滚动时同步行号栏滚动位置 + 更新 minimap 视口指示器 + 同步 overlay 高亮层
   const handleGutterSync = (e: React.UIEvent<HTMLTextAreaElement>) => {
     if (gutterRef.current && e.currentTarget) {
       gutterRef.current.scrollTop = e.currentTarget.scrollTop
+    }
+    // 同步 overlay div 滚动位置（搜索高亮层）
+    if (overlayRef.current && e.currentTarget) {
+      overlayRef.current.scrollTop = e.currentTarget.scrollTop
+      overlayRef.current.scrollLeft = e.currentTarget.scrollLeft
     }
     updateMinimapViewport(e.currentTarget)
   }
@@ -910,6 +925,183 @@ export function EditorArea(props: EditorAreaProps) {
     ro.observe(ta)
     return () => ro.disconnect()
   }, [showMinimap, editorMode, textareaRef, visualLineOffsets])
+
+  // ===== 搜索替换 overlay 高亮渲染（v1.3.0）=====
+  // 搜索专用 mirror div：用于 scrollToMatch 精确测量匹配项像素位置（考虑软换行）
+  const searchMirrorRef = useRef<HTMLDivElement>(null)
+  // 高亮渲染缓存（性能优化：currentIndex 变化时仅切换 class，不重建 innerHTML）
+  const prevCurrentMarkRef = useRef<HTMLElement | null>(null)
+  const prevMatchesLengthRef = useRef(0)
+  // P0-1 修复：缓存 text 内容，文本编辑后匹配数相同时也需重建 innerHTML（否则 overlay 显示旧文本）
+  const prevTextRef = useRef('')
+
+  /** HTML 转义（防止 XSS，overlay innerHTML 构建时使用） */
+  function escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  /** 同步 overlay 样式自 textarea（确保高亮位置精确对齐，复用 measureCaretCoordinates 样式同步逻辑） */
+  const syncOverlayStyle = useCallback((overlay: HTMLDivElement, textarea: HTMLTextAreaElement) => {
+    const taStyle = getComputedStyle(textarea)
+    overlay.style.fontFamily = taStyle.fontFamily
+    overlay.style.fontSize = taStyle.fontSize
+    overlay.style.fontWeight = taStyle.fontWeight
+    overlay.style.fontStyle = taStyle.fontStyle
+    overlay.style.lineHeight = taStyle.lineHeight
+    overlay.style.letterSpacing = taStyle.letterSpacing
+    overlay.style.tabSize = taStyle.tabSize
+    overlay.style.paddingTop = taStyle.paddingTop
+    overlay.style.paddingRight = taStyle.paddingRight
+    overlay.style.paddingBottom = taStyle.paddingBottom
+    overlay.style.paddingLeft = taStyle.paddingLeft
+    overlay.style.borderTopWidth = taStyle.borderTopWidth
+    overlay.style.borderRightWidth = taStyle.borderRightWidth
+    overlay.style.borderBottomWidth = taStyle.borderBottomWidth
+    overlay.style.borderLeftWidth = taStyle.borderLeftWidth
+    overlay.style.whiteSpace = taStyle.whiteSpace || 'pre-wrap'
+    overlay.style.wordBreak = taStyle.wordBreak || 'normal'
+    overlay.style.overflowWrap = taStyle.overflowWrap || 'break-word'
+    // 宽度 = clientWidth - paddingLeft - paddingRight（与 mirror div 计算方式一致，注意 showMinimap 时 paddingRight=96px）
+    const paddingLeft = parseFloat(taStyle.paddingLeft) || 0
+    const paddingRight = parseFloat(taStyle.paddingRight) || 0
+    overlay.style.width = `${textarea.clientWidth - paddingLeft - paddingRight}px`
+  }, [])
+
+  /**
+   * 渲染 overlay 高亮（编辑模式）
+   * 性能优化：matches 数量未变时仅切换 current class，不重建 innerHTML
+   * 匹配项分为两类样式：search-match（黄色）+ search-match-current（橙色）
+   * P0-1 修复：缓存条件增加 text 内容比较，文本编辑后匹配数相同时也需重建 innerHTML
+   */
+  const renderOverlayHighlight = useCallback((
+    overlay: HTMLDivElement,
+    text: string,
+    matches: Match[],
+    currentIndex: number
+  ) => {
+    // 性能优化：matches 数量 + text 内容均未变时，仅切换 current class（避免重建 innerHTML）
+    if (matches.length === prevMatchesLengthRef.current && matches.length > 0
+        && prevCurrentMarkRef.current && prevTextRef.current === text) {
+      prevCurrentMarkRef.current.className = 'search-match'
+      const marks = overlay.querySelectorAll('mark')
+      const newCurrent = marks[currentIndex] as HTMLElement | null
+      if (newCurrent) {
+        newCurrent.className = 'search-match-current'
+        prevCurrentMarkRef.current = newCurrent
+        return
+      }
+    }
+    // matches 变化或 text 变化：重建全部 innerHTML
+    overlay.innerHTML = ''
+    if (matches.length === 0) {
+      prevMatchesLengthRef.current = 0
+      prevCurrentMarkRef.current = null
+      prevTextRef.current = ''
+      return
+    }
+    let lastEnd = 0
+    const fragments: string[] = []
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i]
+      // 普通文本段（转义防止 XSS）
+      fragments.push(escapeHtml(text.slice(lastEnd, m.start)))
+      // 高亮段
+      const cls = i === currentIndex ? 'search-match-current' : 'search-match'
+      fragments.push(`<mark class="${cls}">${escapeHtml(m.text)}</mark>`)
+      lastEnd = m.end
+    }
+    // 末尾普通文本
+    fragments.push(escapeHtml(text.slice(lastEnd)))
+    overlay.innerHTML = fragments.join('')
+    prevMatchesLengthRef.current = matches.length
+    prevCurrentMarkRef.current = overlay.querySelectorAll('mark')[currentIndex] as HTMLElement | null
+    // P0-1 修复：缓存当前 text 内容
+    prevTextRef.current = text
+  }, [])
+
+  /**
+   * 滚动到当前匹配项
+   * 使用 searchMirror div 精确测量像素位置（考虑软换行）
+   * 复用 EditorArea 现有 mirror div 测量技术（visualLineOffsets 同款方案）
+   * 无 mirror div 时降级为行号 × 行高估算（可能有软换行偏差）
+   * P1-4 修复：动态同步 mirrorDiv 的 padding 样式，使 scrollHeight 含 padding 后减去 paddingTop 计算正确
+   * P1-5 修复：动态同步 mirrorDiv 的 width 样式，确保软换行位置与 textarea 一致
+   */
+  const scrollToCurrentMatch = useCallback((
+    textarea: HTMLTextAreaElement,
+    match: Match,
+    mirrorDiv: HTMLDivElement | null
+  ) => {
+    if (mirrorDiv) {
+      const taStyle = getComputedStyle(textarea)
+      // P1-5 修复：同步 width（clientWidth 含 padding 但不含 border/scrollbar，与 textarea 内容区一致）
+      mirrorDiv.style.width = `${textarea.clientWidth}px`
+      // P1-4 修复：同步 padding（使 scrollHeight 包含 padding，计算时减去 paddingTop 得到纯文本高度）
+      mirrorDiv.style.paddingTop = taStyle.paddingTop
+      mirrorDiv.style.paddingRight = taStyle.paddingRight
+      mirrorDiv.style.paddingBottom = taStyle.paddingBottom
+      mirrorDiv.style.paddingLeft = taStyle.paddingLeft
+      mirrorDiv.style.fontFamily = taStyle.fontFamily
+      mirrorDiv.style.fontSize = taStyle.fontSize
+      mirrorDiv.style.lineHeight = taStyle.lineHeight
+      mirrorDiv.style.letterSpacing = taStyle.letterSpacing
+      // 精确测量：用 mirror div 填入匹配前的文本，测量 scrollHeight
+      const textBefore = textarea.value.slice(0, match.start)
+      mirrorDiv.textContent = textBefore || '\u00A0'
+      const taPaddingTop = parseFloat(taStyle.paddingTop) || 24
+      // mirrorDiv.scrollHeight = paddingTop + 文本高度 + paddingBottom
+      // 因 .editor CSS 中 paddingTop === paddingBottom（同一 CSS 变量 --editor-padding-y）
+      // 故 targetTop = scrollHeight - paddingTop = 文本高度 + paddingBottom = paddingTop + 文本高度
+      // 即匹配项在 scrollable content 中的正确垂直位置
+      const targetTop = mirrorDiv.scrollHeight - taPaddingTop
+      // 仅在匹配项不在视口内时滚动
+      if (targetTop < textarea.scrollTop || targetTop > textarea.scrollTop + textarea.clientHeight) {
+        textarea.scrollTop = targetTop - textarea.clientHeight / 3
+      }
+    } else {
+      // 降级：用行号估算（无 mirror div 时，可能有软换行偏差）
+      const taStyle = getComputedStyle(textarea)
+      const lineHeight = parseFloat(taStyle.lineHeight) || 24
+      const targetTop = match.line * lineHeight
+      if (targetTop < textarea.scrollTop || targetTop > textarea.scrollTop + textarea.clientHeight) {
+        textarea.scrollTop = targetTop - textarea.clientHeight / 3
+      }
+    }
+    textarea.focus()
+    textarea.setSelectionRange(match.start, match.end)
+  }, [])
+
+  // 副作用：搜索状态变化时渲染高亮 + 滚动 + with-search class 切换
+  useEffect(() => {
+    const textarea = textareaRef.current
+    const overlay = overlayRef.current
+    if (!textarea || !overlay) return
+
+    if (!searchIsActive || editorMode !== 'code') {
+      // 搜索关闭或非编辑模式：清除高亮 + 移除 with-search class
+      overlay.innerHTML = ''
+      prevMatchesLengthRef.current = 0
+      prevCurrentMarkRef.current = null
+      prevTextRef.current = ''
+      textarea.classList.remove('with-search')
+      return
+    }
+
+    // 编辑模式 + 搜索激活：同步 overlay 样式 + 渲染高亮 + 添加 with-search class
+    syncOverlayStyle(overlay, textarea)
+    renderOverlayHighlight(overlay, text, searchMatches, searchCurrentIndex)
+    textarea.classList.add('with-search')
+
+    // 滚动到当前匹配项
+    if (searchCurrentIndex >= 0 && searchCurrentIndex < searchMatches.length) {
+      scrollToCurrentMatch(textarea, searchMatches[searchCurrentIndex], searchMirrorRef.current)
+    }
+  }, [searchMatches, searchCurrentIndex, searchIsActive, editorMode, text, textareaRef, overlayRef, syncOverlayStyle, renderOverlayHighlight, scrollToCurrentMatch])
 
   return (
     <>
@@ -945,6 +1137,43 @@ export function EditorArea(props: EditorAreaProps) {
               left: '-9999px',
               top: '0',
               width: `${textareaWidth}px`,
+              padding: '0',
+              margin: '0',
+              border: '0',
+              font: 'inherit',
+              fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--editor-font') || 'monospace',
+              fontSize: getComputedStyle(document.documentElement).getPropertyValue('--editor-font-size') || '14px',
+              lineHeight: getComputedStyle(document.documentElement).getPropertyValue('--editor-line-height') || '1.7',
+              letterSpacing: '0.3px',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              overflow: 'hidden',
+              visibility: 'hidden',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+        {/* 搜索高亮 overlay div（v1.3.0）：位于 textarea 下方，pointer-events: none 不拦截鼠标
+            textarea 文字透明（with-search class）+ caret 可见，overlay 用 <mark> 高亮匹配
+            样式由 syncOverlayStyle() 从 textarea 同步，确保高亮位置精确对齐 */}
+        {editorMode === 'code' && (
+          <div
+            ref={overlayRef}
+            className="editor-overlay"
+            aria-hidden="true"
+          />
+        )}
+        {/* 搜索专用 mirror div：用于 scrollToCurrentMatch 精确测量匹配项像素位置
+            复制 textarea 样式，填入匹配前文本测量 scrollHeight（考虑软换行）
+            仅在搜索激活 + 编辑模式时渲染 */}
+        {searchIsActive && editorMode === 'code' && (
+          <div
+            ref={searchMirrorRef}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-9999px',
+              top: '0',
               padding: '0',
               margin: '0',
               border: '0',

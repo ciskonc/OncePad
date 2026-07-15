@@ -53,21 +53,32 @@
     },
     "fileAssociations": [
       {
-        "ext": ["md", "markdown"],
+        "ext": [
+          "md",
+          "markdown"
+        ],
         "name": "OncePad.Markdown",
         "description": "Markdown 文件",
         "icon": "build/icon.ico",
         "role": "Editor"
       },
       {
-        "ext": ["txt", "text", "log"],
+        "ext": [
+          "txt",
+          "text",
+          "log"
+        ],
         "name": "OncePad.PlainText",
         "description": "纯文本文件",
         "icon": "build/icon.ico",
         "role": "Editor"
       },
       {
-        "ext": ["json", "yml", "yaml"],
+        "ext": [
+          "json",
+          "yml",
+          "yaml"
+        ],
         "name": "OncePad.Config",
         "description": "配置文件",
         "icon": "build/icon.ico",
@@ -90,6 +101,7 @@
     }
   },
   "devDependencies": {
+    "@types/mark.js": "^8.11.12",
     "@types/markdown-it": "^14.1.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
@@ -107,6 +119,7 @@
     "dompurify": "^3.4.11",
     "font-list": "^2.1.0",
     "i18next": "^26.3.1",
+    "mark.js": "^8.11.1",
     "markdown-it": "^14.2.0",
     "marked": "^18.0.5",
     "react": "^18.2.0",

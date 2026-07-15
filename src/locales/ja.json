@@ -250,5 +250,21 @@
     "save": "保存",
     "discard": "保存しない",
     "cancel": "キャンセル"
+  },
+  "search": {
+    "placeholder": "検索...",
+    "replacePlaceholder": "置換...",
+    "caseSensitive": "大文字小文字を区別",
+    "wholeWord": "完全一致",
+    "regex": "正規表現",
+    "next": "次へ",
+    "prev": "前へ",
+    "replace": "置換",
+    "replaceAll": "すべて置換",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "一致なし",
+    "close": "閉じる",
+    "regexError": "正規表現エラー：{{message}}",
+    "replacedCount": "{{count}} 件置換しました"
   }
 }

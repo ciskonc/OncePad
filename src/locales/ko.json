@@ -250,5 +250,21 @@
     "save": "저장",
     "discard": "저장 안 함",
     "cancel": "취소"
+  },
+  "search": {
+    "placeholder": "검색...",
+    "replacePlaceholder": "바꾸기...",
+    "caseSensitive": "대소문자 구분",
+    "wholeWord": "전체 단어",
+    "regex": "정규식",
+    "next": "다음",
+    "prev": "이전",
+    "replace": "바꾸기",
+    "replaceAll": "모두 바꾸기",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "일치 없음",
+    "close": "닫기",
+    "regexError": "정규식 오류: {{message}}",
+    "replacedCount": "{{count}}개 바꿈"
   }
 }

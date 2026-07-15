@@ -250,5 +250,21 @@
     "save": "Сохранить",
     "discard": "Не сохранять",
     "cancel": "Отмена"
+  },
+  "search": {
+    "placeholder": "Поиск...",
+    "replacePlaceholder": "Заменить на...",
+    "caseSensitive": "Учитывать регистр",
+    "wholeWord": "Слово целиком",
+    "regex": "Регулярное выражение",
+    "next": "Далее",
+    "prev": "Назад",
+    "replace": "Заменить",
+    "replaceAll": "Заменить все",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "Не найдено",
+    "close": "Закрыть",
+    "regexError": "Ошибка regex: {{message}}",
+    "replacedCount": "Заменено {{count}} вхождений"
   }
 }

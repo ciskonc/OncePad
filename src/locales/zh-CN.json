@@ -249,5 +249,21 @@
     "save": "保存",
     "discard": "不保存",
     "cancel": "取消"
+  },
+  "search": {
+    "placeholder": "搜索...",
+    "replacePlaceholder": "替换为...",
+    "caseSensitive": "区分大小写",
+    "wholeWord": "全词匹配",
+    "regex": "正则表达式",
+    "next": "下一个",
+    "prev": "上一个",
+    "replace": "替换",
+    "replaceAll": "全部替换",
+    "matchCount": "{{current}}/{{total}}",
+    "noMatch": "无匹配",
+    "close": "关闭",
+    "regexError": "正则错误：{{message}}",
+    "replacedCount": "已替换 {{count}} 处"
   }
 }

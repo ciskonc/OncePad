@@ -12,6 +12,8 @@ import { useAutoSave } from './hooks/useAutoSave'
 import { SettingsPanel, type SettingsTab, type ShortcutTarget } from './components/SettingsPanel'
 import { NotesPanel, type NoteFilter } from './components/NotesPanel'
 import { EditorArea, type OutlineItem } from './components/EditorArea'
+import { SearchReplacePanel } from './components/SearchReplacePanel'
+import { useSearchReplace } from './hooks/useSearchReplace'
 
 function App() {
   const { t, i18n } = useTranslation()
@@ -134,6 +136,14 @@ function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   // MD 预览区引用，用于切换模式时同步滚动位置
   const previewRef = useRef<HTMLDivElement>(null)
+  // 搜索高亮 overlay 层引用（v1.3.0 搜索替换功能）
+  const overlayRef = useRef<HTMLDivElement>(null)
+  // 搜索替换功能 hook（v1.3.0）
+  const searchReplace = useSearchReplace({
+    text,
+    onTextChange: setText,
+    textareaRef,
+  })
   // 光标行号跟踪（用于模式切换时定位）
   const cursorLineRef = useRef<number>(0)
   // 高亮行号（切换模式后短暂高亮，自动消失）
@@ -1673,6 +1683,30 @@ function App() {
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // v1.3.0 搜索替换快捷键：Ctrl+F 打开搜索，Ctrl+H 打开替换
+    // 必须显式 preventDefault 阻止 Electron/Chromium 默认查找框
+    const isMac = navigator.userAgent.includes('Mac')
+    // Ctrl+F / Cmd+F 打开搜索面板（仅搜索框）
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && !e.shiftKey && !e.altKey) {
+      e.preventDefault()
+      searchReplace.openSearch(false)  // false = 不显示替换框
+      return
+    }
+    // Ctrl+H / Cmd+Alt+F 打开替换面板（含替换框）
+    // 注意：macOS 上 Cmd+H 是隐藏窗口系统快捷键，改用 Cmd+Alt+F 避免冲突
+    if (isMac) {
+      if (e.metaKey && e.altKey && e.key === 'f' && !e.shiftKey) {
+        e.preventDefault()
+        searchReplace.openSearch(true)  // true = 显示替换框
+        return
+      }
+    } else {
+      if (e.ctrlKey && e.key === 'h' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        searchReplace.openSearch(true)
+        return
+      }
+    }
     if (matchShortcut(e, newShortcut)) {
       e.preventDefault()
       // v1.1.3 修复 Bug M-4：newShortcut 改走 handleNewWithCheck，统一经过未保存检查
@@ -1746,7 +1780,10 @@ function App() {
     }
     if (e.key === 'Escape') {
       // Escape 行为优化：按优先级关闭浮层，全部关闭后才隐藏窗口
-      if (showColorPicker) {
+      // v1.3.0：搜索面板最高优先级（搜索面板打开时 Escape 首先关闭搜索面板）
+      if (searchReplace.state.isActive) {
+        searchReplace.closeSearch()
+      } else if (showColorPicker) {
         setShowColorPicker(false)
       } else if (showOutline) {
         setShowOutline(false)
@@ -1762,7 +1799,7 @@ function App() {
         window.electronAPI.hideWindow()
       }
     }
-  }, [showNotes, showSettings, showColorPicker, showOutline, noteContextMenu, workspaceContextMenu, saveCurrentNote, handleNewWithCheck, handleCopy, newShortcut, copyShortcut, adjustFontSize, editorMode, wrapSelection, insertLink, fileInfo, handleSaveToFile, handleSaveAs])
+  }, [showNotes, showSettings, showColorPicker, showOutline, noteContextMenu, workspaceContextMenu, saveCurrentNote, handleNewWithCheck, handleCopy, newShortcut, copyShortcut, adjustFontSize, editorMode, wrapSelection, insertLink, fileInfo, handleSaveToFile, handleSaveAs, searchReplace])
 
   // 当前笔记的标签徽章（解析 tagId → 名称）
   const currentNoteTags = useMemo(() => {
@@ -2260,7 +2297,32 @@ function App() {
           seqAcceptOnEnter={seqAcceptOnEnter}
           debugMode={debugMode}
           linkClickBehavior={linkClickBehavior}
+          overlayRef={overlayRef}
+          searchMatches={searchReplace.state.matches}
+          searchCurrentIndex={searchReplace.state.currentIndex}
+          searchIsActive={searchReplace.state.isActive}
         />
+
+        {/* 搜索替换面板（v1.3.0）— 右上角悬浮，Ctrl+F / Ctrl+H 唤起 */}
+        {searchReplace.state.isActive && (
+          <SearchReplacePanel
+            state={searchReplace.state}
+            onQueryChange={searchReplace.setQuery}
+            onReplaceChange={searchReplace.setReplace}
+            onOptionChange={searchReplace.setOption}
+            onNavigate={searchReplace.navigateMatch}
+            onReplaceCurrent={searchReplace.replaceCurrent}
+            onReplaceAll={() => {
+              // P1-2 修复：replaceAll 后显示 toast 反馈替换数量
+              const count = searchReplace.replaceAll()
+              if (count !== undefined && count > 0) {
+                setToastMessage(t('search.replacedCount', { count }))
+                safeTimeout(() => { setToastMessage(null) }, 1500)
+              }
+            }}
+            onClose={searchReplace.closeSearch}
+          />
+        )}
 
         {/* 笔记面板 — 拆分为独立组件 NotesPanel，所有 state/handlers 通过 props 传入 */}
         {showNotes && (
