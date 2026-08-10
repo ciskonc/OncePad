@@ -5,6 +5,28 @@
  * @param e React 键盘事件
  * @param shortcut 快捷键字符串，如 'Control+J'、'Control+Shift+C'
  */
+/**
+ * v1.3.0 需求 3：原生 KeyboardEvent 版本的快捷键匹配（用于 window 捕获阶段监听）
+ * 用法与 matchShortcut 相同，但接受原生 KeyboardEvent
+ */
+export function matchesShortcutString(e: KeyboardEvent, shortcut: string): boolean {
+  if (!shortcut) return false
+  const parts = shortcut.split('+')
+  if (parts.length < 2) return false
+  const key = parts[parts.length - 1]
+  const modifiers = parts.slice(0, -1)
+  const expectMeta = modifiers.includes('Command') || modifiers.includes('Meta')
+  const expectCtrl = modifiers.includes('Control')
+  const expectAlt = modifiers.includes('Alt')
+  const expectShift = modifiers.includes('Shift')
+  if (!!e.metaKey !== expectMeta) return false
+  if (!!e.ctrlKey !== expectCtrl) return false
+  if (!!e.altKey !== expectAlt) return false
+  if (!!e.shiftKey !== expectShift) return false
+  const eventKey = e.key.length === 1 ? e.key.toUpperCase() : e.key
+  return eventKey === key
+}
+
 export function matchShortcut(e: React.KeyboardEvent, shortcut: string): boolean {
   if (!shortcut) return false
   const parts = shortcut.split('+')

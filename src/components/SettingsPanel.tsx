@@ -7,7 +7,7 @@ import { normalizeFontName } from '../lib/format'
 // 这两个类型原本定义在 App.tsx 中，拆分 SettingsPanel 组件时迁移至此处并导出，
 // 供 App.tsx 复用，避免循环依赖。
 export type SettingsTab = 'general' | 'appearance' | 'editor' | 'shortcuts' | 'management' | 'debug'
-export type ShortcutTarget = 'toggle' | 'new' | 'copy'
+export type ShortcutTarget = 'toggle' | 'new' | 'copy' | 'recentFiles'
 
 /**
  * SettingsPanel 组件 Props 接口
@@ -88,6 +88,10 @@ interface SettingsPanelProps {
     copy: boolean
     notes: boolean
     settings: boolean
+    // v1.3.0 需求 3：最近打开文件按钮
+    recentFiles: boolean
+    // v1.3.0 后续 3：复制文件路径按钮
+    copyPath: boolean
   }
   onNavbarButtonChange: (key: string, enabled: boolean) => void
 
@@ -98,6 +102,13 @@ interface SettingsPanelProps {
   newShortcutInput: string
   copyShortcut: string
   copyShortcutInput: string
+  // v1.3.0 需求 3：历史文件面板快捷键
+  recentFilesShortcut: string
+  recentFilesShortcutInput: string
+  // v1.3.0 需求 3：历史文件面板快捷键 handlers
+  onSaveRecentFilesShortcut: () => void
+  onResetRecentFilesShortcut: () => void
+  onClearRecentFilesShortcut: () => void
   recordingTarget: ShortcutTarget | null
   // setRecordingTarget 的类型签名，兼容直接传值和函数式更新两种用法
   onSetRecordingTarget: (target: ShortcutTarget | null | ((prev: ShortcutTarget | null) => ShortcutTarget | null)) => void
@@ -570,6 +581,28 @@ export function SettingsPanel(props: SettingsPanelProps) {
                     <span className="switch-slider" />
                   </label>
                 </label>
+                <label className="navbar-button-toggle">
+                  <span>{t('settings.navbarRecentFiles', '最近打开文件')}</span>
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={props.navbarButtons.recentFiles}
+                      onChange={(e) => props.onNavbarButtonChange('recentFiles', e.target.checked)}
+                    />
+                    <span className="switch-slider" />
+                  </label>
+                </label>
+                <label className="navbar-button-toggle">
+                  <span>{t('settings.navbarCopyPath', '复制文件路径')}</span>
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={props.navbarButtons.copyPath}
+                      onChange={(e) => props.onNavbarButtonChange('copyPath', e.target.checked)}
+                    />
+                    <span className="switch-slider" />
+                  </label>
+                </label>
                 <label className="navbar-button-toggle navbar-button-locked">
                   <span>{t('settings.navbarSettings', '设置')}</span>
                   <label className="switch">
@@ -872,6 +905,40 @@ export function SettingsPanel(props: SettingsPanelProps) {
               </div>
               <div className="shortcut-hint">
                 {t('settings.localHint')}
+              </div>
+            </div>
+            <div className="settings-item">
+              <div className="settings-label">{t('settings.recentFilesShortcut', '历史打开文件面板快捷键')}</div>
+              <div className="shortcut-current">
+                {t('settings.current')} <code>{props.recentFilesShortcut || t('settings.notSet', '未设置')}</code>
+              </div>
+              <input
+                type="text"
+                className={`shortcut-input ${props.recordingTarget === 'recentFiles' ? 'recording' : ''}`}
+                value={props.recordingTarget === 'recentFiles' ? t('settings.pressKeys') : props.recentFilesShortcutInput}
+                onKeyDown={props.onShortcutKeyDown}
+                onFocus={() => props.onSetRecordingTarget('recentFiles')}
+                onBlur={() => props.onSetRecordingTarget((t) => (t === 'recentFiles' ? null : t))}
+                readOnly
+                placeholder={t('settings.clickToRecord')}
+              />
+              <div className="shortcut-actions">
+                <button
+                  className="btn-save"
+                  onClick={props.onSaveRecentFilesShortcut}
+                  disabled={props.recentFilesShortcutInput === props.recentFilesShortcut || !props.recentFilesShortcutInput.trim()}
+                >
+                  {t('settings.save')}
+                </button>
+                <button className="btn-secondary" onClick={props.onResetRecentFilesShortcut}>
+                  {t('settings.resetDefault')}
+                </button>
+                <button className="btn-secondary" onClick={props.onClearRecentFilesShortcut}>
+                  {t('settings.clear')}
+                </button>
+              </div>
+              <div className="shortcut-hint">
+                {t('settings.recentFilesShortcutHint', '唤起历史打开文件命令面板（默认 Ctrl+Shift+O）')}
               </div>
             </div>
             <div className="settings-item">

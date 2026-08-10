@@ -17,7 +17,13 @@
     "fileSaveAs": "另存新檔...",
     "fileClose": "關閉檔案",
     "fileShowInFolder": "跳轉檔案所在資料夾",
-    "about": "關於 {{name}}"
+    "about": "關於 {{name}}",
+    "fileRecent": "最近打开...",
+    "recentFiles": "最近打开",
+    "recentFilesWithShortcut": "最近打开 ({{shortcut}})",
+    "fileCopyPath": "复制文件路径",
+    "copyPath": "复制文件路径",
+    "copyPathNoFile": "请先打开文件"
   },
   "editor": {
     "placeholder": "在此輸入...",
@@ -34,7 +40,8 @@
     "chars": "{{count}} 字元",
     "lines": "{{count}} 行",
     "outline": "大綱",
-    "linkOpenConfirm": "是否使用系統瀏覽器開啟此連結？"
+    "linkOpenConfirm": "是否使用系統瀏覽器開啟此連結？",
+    "pathCopied": "路径已复制"
   },
   "notes": {
     "title": "筆記",
@@ -238,7 +245,11 @@
     "fileAssociationDesc": "管理 OncePad 關聯的檔案類型。預設關聯 Markdown 和純文字檔案，其他類型可手動開啟。",
     "fileAssociationDefault": "預設關聯（已啟用）",
     "fileAssociationBatNote": "關於 .bat / .cmd 檔案",
-    "fileAssociationBatNoteDesc": "OncePad 永遠不會接管 .bat / .cmd 檔案關聯，以保證開發者正常使用批次腳本。如需用 OncePad 編輯 .bat 檔案，請右鍵選擇「開啟方式」。"
+    "fileAssociationBatNoteDesc": "OncePad 永遠不會接管 .bat / .cmd 檔案關聯，以保證開發者正常使用批次腳本。如需用 OncePad 編輯 .bat 檔案，請右鍵選擇「開啟方式」。",
+    "recentFilesShortcut": "历史打开文件面板快捷键",
+    "recentFilesShortcutHint": "唤起历史打开文件命令面板（默认 Ctrl+Shift+O）",
+    "navbarRecentFiles": "最近打开文件",
+    "navbarCopyPath": "复制文件路径"
   },
   "about": {
     "description": "一款輕量級隨叫隨到的臨時筆記本",
@@ -265,6 +276,30 @@
     "noMatch": "無匹配",
     "close": "關閉",
     "regexError": "正規錯誤：{{message}}",
-    "replacedCount": "已替換 {{count}} 處"
+    "replacedCount": "已替換 {{count}} 處",
+    "expandReplace": "展開替換",
+    "collapseReplace": "收起替換"
+  },
+  "file": {
+    "externalChange": {
+      "title": "文件已被外部修改",
+      "desc": "文件 \"{{fileName}}\" 在磁盘上被修改。如何处理？",
+      "keep": "保留我的修改",
+      "reload": "重载（用磁盘最新版）",
+      "reloaded": "已重载",
+      "kept": "已保留我的修改",
+      "reloadFailed": "重载失败：{{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "最近打开的文件",
+    "placeholder": "搜索文件名或路径...",
+    "empty": "暂无最近打开的文件",
+    "noMatch": "无匹配项",
+    "clear": "清空",
+    "confirmClear": "确定要清空最近打开的文件记录吗？",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintClose": "关闭"
   }
 }

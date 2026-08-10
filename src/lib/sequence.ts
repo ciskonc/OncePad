@@ -138,8 +138,8 @@ export function nextListPrefix(currentPrefix: string): string | null {
     if (next <= 20) return `${String.fromCharCode(0x2460 + next - 1)}${m[2]}`
     if (next <= 35) return `${String.fromCharCode(0x3251 + next - 21)}${m[2]}`
     if (next <= 50) return `${String.fromCharCode(0x32B1 + next - 36)}${m[2]}`
-    // 超过 ㊿，降级为阿拉伯数字
-    return `${next}. ${m[2]}`
+    // 超过 ㊿，降级为阿拉伯数字（去掉 m[2] 前导空格避免双空格）
+    return `${next}.${m[2].replace(/^\s+/, ' ')}`
   }
 
   // 4. 中文数字 + 分隔符（通配：、 ， , . 空格）

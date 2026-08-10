@@ -21,6 +21,11 @@ const forceClose = new Set<number>()
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
+// 调试辅助：dev 模式开启 Chrome DevTools 远程调试端口，便于外部连接检查 DOM 定位
+if (VITE_DEV_SERVER_URL) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9223')
+}
+
 // v1.1.0：支持 --user-data-dir 命令行参数，用于测试版与日常版数据隔离
 // 用法：OncePad.exe --user-data-dir=D:\test-data 或 --user-data-dir D:\test-data
 // 必须在 app.getPath('userData') 首次调用前设置，否则路径不会生效
@@ -119,6 +124,8 @@ const defaultMod = 'Control'
 const defaultShortcut = 'Alt+Q'
 const defaultNewShortcut = ''
 const defaultCopyShortcut = ''
+// v1.3.0 需求 3：默认 Ctrl+Shift+O 唤起历史文件面板（用户可在设置里改）
+const defaultRecentFilesShortcut = 'Control+Shift+O'
 
 const shortcutValidator = /^(Command|Control|Alt|Shift|Meta|Super)(\+(Command|Control|Alt|Shift|Meta|Super))*\+[A-Za-z0-9]$/
 
@@ -126,6 +133,8 @@ interface Config {
   shortcut: string
   newShortcut: string
   copyShortcut: string
+  // v1.3.0 需求 3：历史打开文件面板快捷键（默认 Ctrl+Shift+O）
+  recentFilesShortcut?: string
   alwaysOnTop: boolean
   indentType: 'space' | 'tab'
   indentSize: number
@@ -189,6 +198,103 @@ interface HistoryEntry {
   text: string
   createdAt: string
 }
+
+
+interface RecentFileEntry {
+  filePath: string
+  fileName: string
+  lastOpenedAt: string
+  preview: string
+}
+
+const recentFilesPath = path.join(app.getPath('userData'), 'recent-files.json')
+
+function loadRecentFiles(): RecentFileEntry[] {
+  try {
+    if (fs.existsSync(recentFilesPath)) {
+      const data = JSON.parse(fs.readFileSync(recentFilesPath, 'utf-8'))
+      if (Array.isArray(data)) return data
+    }
+  } catch {}
+  return []
+}
+
+function saveRecentFiles(entries: RecentFileEntry[]) {
+  try {
+    fs.writeFileSync(recentFilesPath, JSON.stringify(entries, null, 2))
+  } catch (e) {
+    console.error('保存 recent-files.json 失败:', e)
+  }
+}
+
+function pushRecentFile(filePath: string, preview: string) {
+  const list = loadRecentFiles().filter(e => e.filePath !== filePath)
+  const entry: RecentFileEntry = {
+    filePath,
+    fileName: path.basename(filePath),
+    lastOpenedAt: new Date().toISOString(),
+    preview: preview.slice(0, 80),
+  }
+  list.unshift(entry)
+  if (list.length > 50) list.length = 50
+  saveRecentFiles(list)
+}
+
+interface FileWatcherEntry {
+  watcher: fs.FSWatcher
+  filePath: string
+  lastMtimeMs: number
+  ignoreUntilMs: number
+}
+const fileWatchers = new Map<number, FileWatcherEntry>()
+
+function installFileWatcher(windowId: number, filePath: string) {
+  uninstallFileWatcher(windowId)
+  if (!filePath) return
+  try {
+    if (!fs.existsSync(filePath)) return
+    const stat = fs.statSync(filePath)
+    const watcher = fs.watch(filePath, { persistent: false }, (eventType) => {
+      const entry = fileWatchers.get(windowId)
+      if (!entry || entry.filePath !== filePath) return
+      if (Date.now() < entry.ignoreUntilMs) return
+      let curMtime = 0
+      try { curMtime = fs.statSync(filePath).mtimeMs } catch { return }
+      if (curMtime <= entry.lastMtimeMs) return
+      const win = BrowserWindow.fromId(windowId)
+      if (!win || win.isDestroyed()) return
+      win.webContents.send('file:external-change', { filePath, eventType })
+      entry.lastMtimeMs = curMtime
+    })
+    fileWatchers.set(windowId, {
+      watcher,
+      filePath,
+      lastMtimeMs: stat.mtimeMs,
+      ignoreUntilMs: 0,
+    })
+  } catch (e) {
+    console.error('安装文件监视器失败:', e)
+  }
+}
+
+function uninstallFileWatcher(windowId: number) {
+  const entry = fileWatchers.get(windowId)
+  if (entry) {
+    try { entry.watcher.close() } catch {}
+    fileWatchers.delete(windowId)
+  }
+}
+
+function ignoreNextWatcherEvent(windowId: number, filePath: string) {
+  const entry = fileWatchers.get(windowId)
+  if (entry && entry.filePath === filePath) {
+    entry.ignoreUntilMs = Date.now() + 500
+    try {
+      entry.lastMtimeMs = fs.statSync(filePath).mtimeMs
+    } catch {}
+  }
+}
+
 
 // ===== 笔记存储相关类型（Task 1 新增，与 types.d.ts 保持一致） =====
 type NoteColor = 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple'
@@ -334,6 +440,9 @@ function loadConfig(): Config {
           : (typeof saved.copyShortcut === 'string' && shortcutValidator.test(saved.copyShortcut)
             ? saved.copyShortcut
             : defaultCopyShortcut),
+        recentFilesShortcut: typeof saved.recentFilesShortcut === 'string' && shortcutValidator.test(saved.recentFilesShortcut)
+          ? saved.recentFilesShortcut
+          : defaultRecentFilesShortcut,
         alwaysOnTop: saved.alwaysOnTop === true,
         indentType: saved.indentType === 'tab' ? 'tab' : 'space',
         indentSize: [2, 4, 6, 8].includes(Number(saved.indentSize)) ? Number(saved.indentSize) : 2,
@@ -385,6 +494,10 @@ function loadConfig(): Config {
           copy: saved.navbarButtons?.copy !== false,
           notes: saved.navbarButtons?.notes !== false,
           settings: saved.navbarButtons?.settings !== false,
+          // v1.3.0 需求 3：最近打开文件按钮（默认显示）
+          recentFiles: saved.navbarButtons?.recentFiles !== false,
+          // v1.3.0 后续 3：复制文件路径按钮（默认隐藏）
+          copyPath: saved.navbarButtons?.copyPath === true,
         },
         // v1.1.0：调试面板开关（默认 false）
         showDebugTab: saved.showDebugTab === true,
@@ -1658,6 +1771,12 @@ app.on('child-process-gone', (_event, details) => {
 })
 
 app.whenReady().then(() => {
+  // ===== BUG5 修复：移除默认应用菜单 =====
+  // 默认菜单的 Edit 子菜单含 role:'find'（绑定 Ctrl+F）与 role:'replace'（绑定 Ctrl+H），
+  // 会在原生层拦截按键，导致渲染进程接收不到 Ctrl+F/Ctrl+H，搜索面板无法呼出。
+  // 移除后按键事件直达渲染进程，由渲染进程的 window 捕获监听处理。
+  Menu.setApplicationMenu(null)
+
   // ===== 品牌升级数据迁移（one-time-editor → oncepad）=====
   // 原因：package.json name 从 one-time-editor 改为 oncepad，
   // 导致 Electron app.getPath('userData') 路径变更，用户数据无法访问。
@@ -1731,14 +1850,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('set-local-shortcut', (_event, name: string, shortcut: string) => {
-    if (name !== 'new' && name !== 'copy') return false
+    // v1.3.0 需求 3：扩展支持 'recentFiles' 历史文件面板快捷键
+    if (name !== 'new' && name !== 'copy' && name !== 'recentFiles') return false
     // v1.1.0：允许空字符串（禁用快捷键）或合法快捷键
     if (shortcut !== '' && !shortcutValidator.test(shortcut)) return false
     const config = loadConfig()
     if (name === 'new') {
       config.newShortcut = shortcut
-    } else {
+    } else if (name === 'copy') {
       config.copyShortcut = shortcut
+    } else if (name === 'recentFiles') {
+      config.recentFilesShortcut = shortcut
     }
     saveConfig(config)
     return true
@@ -2201,7 +2323,12 @@ app.whenReady().then(() => {
       config.navbarButtons = {
         pin: true, color: true, newBtn: true,
         copy: true, notes: true, settings: true,
+        recentFiles: true, copyPath: false,
       }
+    } else {
+      // v1.3.0 后续 3：补齐新版字段（兼容旧 config 文件）
+      if (config.navbarButtons.recentFiles === undefined) config.navbarButtons.recentFiles = true
+      if (config.navbarButtons.copyPath === undefined) config.navbarButtons.copyPath = false
     }
     if (key in config.navbarButtons) {
       (config.navbarButtons as Record<string, boolean>)[key] = enabled === true
@@ -2422,10 +2549,12 @@ app.whenReady().then(() => {
 
   // 保存文件：将内容写入指定路径，返回 { success: boolean, error?: string }
   // v1.1.0 扩展：允许保存为任意后缀名（用户可选择保存为 .txt/.log/.json 等）
-  ipcMain.handle('save-file', (_event, filePath: string, content: string) => {
+  ipcMain.handle('save-file', (event, filePath: string, content: string) => {
     try {
       const resolved = path.resolve(filePath)
       fs.writeFileSync(resolved, content, 'utf-8')
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (win) ignoreNextWatcherEvent(win.id, resolved)
       return { success: true }
     } catch (e) {
       console.error('保存文件失败:', e)
@@ -2441,10 +2570,41 @@ app.whenReady().then(() => {
     if (!win) return false
     if (filePath) {
       windowFiles.set(win.id, filePath)
+      installFileWatcher(win.id, filePath)
     } else {
       windowFiles.delete(win.id)
+      uninstallFileWatcher(win.id)
     }
     return true
+  })
+
+  // ===== v1.3.0：需求 3 - 历史打开文件记录 =====
+  ipcMain.handle('add-recent-file', (_event, filePath: string, preview: string) => {
+    pushRecentFile(filePath, preview)
+    return true
+  })
+
+  ipcMain.handle('get-recent-files', () => {
+    return loadRecentFiles()
+  })
+
+  ipcMain.handle('clear-recent-files', () => {
+    saveRecentFiles([])
+    return true
+  })
+
+  // ===== v1.3.0：需求 2 - 读取最新文件内容（外部变更弹窗"重载"调用） =====
+  ipcMain.handle('reload-file', (_event, filePath: string) => {
+    try {
+      const resolved = validateFilePath(filePath)
+      if (!resolved) return { success: false, error: 'invalid path' }
+      const stat = fs.statSync(resolved)
+      if (stat.size > 10 * 1024 * 1024) return { success: false, error: 'too large' }
+      const content = fs.readFileSync(resolved, 'utf-8')
+      return { success: true, content, mtimeMs: stat.mtimeMs }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
   })
 
   // 打开文件对话框：弹出系统选择对话框，读取选中的 .md/.markdown 文件

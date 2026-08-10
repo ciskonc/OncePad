@@ -17,7 +17,13 @@
     "fileSaveAs": "Save As...",
     "fileClose": "Close File",
     "fileShowInFolder": "Show in Folder",
-    "about": "About {{name}}"
+    "about": "About {{name}}",
+    "fileRecent": "Recent files...",
+    "recentFiles": "Recent files",
+    "recentFilesWithShortcut": "Recent files ({{shortcut}})",
+    "fileCopyPath": "Copy file path",
+    "copyPath": "Copy file path",
+    "copyPathNoFile": "Open a file first"
   },
   "editor": {
     "placeholder": "Type here...",
@@ -34,7 +40,8 @@
     "chars": "{{count}} chars",
     "lines": "{{count}} lines",
     "outline": "Outline",
-    "linkOpenConfirm": "Open this link in the system default browser?"
+    "linkOpenConfirm": "Open this link in the system default browser?",
+    "pathCopied": "Path copied"
   },
   "notes": {
     "title": "Notes",
@@ -238,7 +245,11 @@
     "fileAssociationDesc": "Manage which file types OncePad handles. Markdown and plain text are associated by default; others can be enabled manually.",
     "fileAssociationDefault": "Default associations (enabled)",
     "fileAssociationBatNote": "About .bat / .cmd files",
-    "fileAssociationBatNoteDesc": "OncePad will never take over .bat / .cmd file associations to ensure developers can use batch scripts normally. To edit .bat files in OncePad, right-click and choose \"Open with\"."
+    "fileAssociationBatNoteDesc": "OncePad will never take over .bat / .cmd file associations to ensure developers can use batch scripts normally. To edit .bat files in OncePad, right-click and choose \"Open with\".",
+    "recentFilesShortcut": "Recent files shortcut",
+    "recentFilesShortcutHint": "Open the recent files palette (default Ctrl+Shift+O)",
+    "navbarRecentFiles": "Recent files",
+    "navbarCopyPath": "Copy file path"
   },
   "about": {
     "description": "A lightweight, instant-access scratchpad — every piece of scattered text finds its place",
@@ -264,7 +275,31 @@
     "matchCount": "{{current}}/{{total}}",
     "noMatch": "No match",
     "close": "Close",
+    "expandReplace": "Expand replace",
+    "collapseReplace": "Collapse replace",
     "regexError": "Regex error: {{message}}",
     "replacedCount": "Replaced {{count}} occurrence(s)"
+  },
+  "file": {
+    "externalChange": {
+      "title": "File changed externally",
+      "desc": "The file \"{{fileName}}\" has been modified on disk. How would you like to proceed?",
+      "keep": "Keep my changes",
+      "reload": "Reload (use disk version)",
+      "reloaded": "Reloaded",
+      "kept": "Kept my changes",
+      "reloadFailed": "Reload failed: {{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "Recent files",
+    "placeholder": "Search file name or path...",
+    "empty": "No recent files",
+    "noMatch": "No matching items",
+    "clear": "Clear",
+    "confirmClear": "Are you sure you want to clear all recent files?",
+    "hintNavigate": "Navigate",
+    "hintOpen": "Open",
+    "hintClose": "Close"
   }
 }

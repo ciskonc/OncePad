@@ -10,6 +10,7 @@ interface SearchReplacePanelProps {
   onNavigate: (direction: 'next' | 'prev') => void
   onReplaceCurrent: () => void
   onReplaceAll: () => void
+  onToggleReplace: () => void
   onClose: () => void
 }
 
@@ -33,6 +34,7 @@ export function SearchReplacePanel(props: SearchReplacePanelProps) {
     onNavigate,
     onReplaceCurrent,
     onReplaceAll,
+    onToggleReplace,
     onClose,
   } = props
 
@@ -102,6 +104,22 @@ export function SearchReplacePanel(props: SearchReplacePanelProps) {
     >
       {/* 搜索行 */}
       <div className="search-replace-row">
+        {/* 展开/收起替换区按钮（三角箭头，点击切换 state.showReplace） */}
+        <button
+          className={`search-expand-btn ${state.showReplace ? 'open' : ''}`}
+          onClick={onToggleReplace}
+          title={state.showReplace ? t('search.collapseReplace') : t('search.expandReplace')}
+          aria-label={state.showReplace ? t('search.collapseReplace') : t('search.expandReplace')}
+          aria-expanded={state.showReplace}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {/* v1.3.2 UX 修复：箭头方向按用户习惯
+                - showReplace=true（已展开）→ 向上箭头 ∧（点击收起）
+                - showReplace=false（收起）→ 向下箭头 ∨（点击展开）
+                之前是反的（收起显示 ↗ 斜杠），违反通用 UI 习惯 */}
+            <path d={state.showReplace ? 'M6 15l6-6 6-6' : 'M6 9l6 6 6-6'} />
+          </svg>
+        </button>
         <input
           ref={searchInputRef}
           type="text"

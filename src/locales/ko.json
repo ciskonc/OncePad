@@ -17,7 +17,13 @@
     "fileSaveAs": "다른 이름으로 저장...",
     "fileClose": "파일 닫기",
     "fileShowInFolder": "파일 위치 열기",
-    "about": "{{name}} 정보"
+    "about": "{{name}} 정보",
+    "fileRecent": "最近打开...",
+    "recentFiles": "最近打开",
+    "recentFilesWithShortcut": "最近打开 ({{shortcut}})",
+    "fileCopyPath": "Copy file path",
+    "copyPath": "Copy file path",
+    "copyPathNoFile": "Open a file first"
   },
   "editor": {
     "placeholder": "여기에 입력하세요...",
@@ -34,7 +40,8 @@
     "chars": "{{count}}자",
     "lines": "{{count}}줄",
     "outline": "개요",
-    "linkOpenConfirm": "시스템 기본 브라우저로 이 링크를 여시겠습니까?"
+    "linkOpenConfirm": "시스템 기본 브라우저로 이 링크를 여시겠습니까?",
+    "pathCopied": "Path copied"
   },
   "notes": {
     "title": "메모",
@@ -238,7 +245,11 @@
     "fileAssociationDesc": "OncePad가 처리할 파일 형식을 관리합니다. Markdown과 일반 텍스트는 기본적으로 연결되며, 기타 형식은 수동으로 활성화할 수 있습니다.",
     "fileAssociationDefault": "기본 연결 (활성화됨)",
     "fileAssociationBatNote": ".bat / .cmd 파일에 대하여",
-    "fileAssociationBatNoteDesc": "OncePad는 개발자가 배치 스크립트를 정상적으로 사용할 수 있도록 .bat / .cmd 파일 연결을 절대 가져오지 않습니다. OncePad로 .bat 파일을 편집하려면 마우스 오른쪽 버튼 클릭 후 \"연결 프로그램\"을 선택하세요."
+    "fileAssociationBatNoteDesc": "OncePad는 개발자가 배치 스크립트를 정상적으로 사용할 수 있도록 .bat / .cmd 파일 연결을 절대 가져오지 않습니다. OncePad로 .bat 파일을 편집하려면 마우스 오른쪽 버튼 클릭 후 \"연결 프로그램\"을 선택하세요.",
+    "recentFilesShortcut": "历史打开文件面板快捷键",
+    "recentFilesShortcutHint": "唤起历史打开文件命令面板（默认 Ctrl+Shift+O）",
+    "navbarRecentFiles": "最近打开文件",
+    "navbarCopyPath": "Copy file path"
   },
   "about": {
     "description": "언제든 불러올 수 있는 가벼운 임시 노트",
@@ -265,6 +276,30 @@
     "noMatch": "일치 없음",
     "close": "닫기",
     "regexError": "정규식 오류: {{message}}",
-    "replacedCount": "{{count}}개 바꿈"
+    "replacedCount": "{{count}}개 바꿈",
+    "expandReplace": "바꾸기 펼치기",
+    "collapseReplace": "바꾸기 접기"
+  },
+  "file": {
+    "externalChange": {
+      "title": "文件已被外部修改",
+      "desc": "文件 \"{{fileName}}\" 在磁盘上被修改。如何处理？",
+      "keep": "保留我的修改",
+      "reload": "重载（用磁盘最新版）",
+      "reloaded": "已重载",
+      "kept": "已保留我的修改",
+      "reloadFailed": "重载失败：{{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "最近打开的文件",
+    "placeholder": "搜索文件名或路径...",
+    "empty": "暂无最近打开的文件",
+    "noMatch": "无匹配项",
+    "clear": "清空",
+    "confirmClear": "确定要清空最近打开的文件记录吗？",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintClose": "关闭"
   }
 }

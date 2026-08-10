@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import './i18n'
 import type { Note, NoteIndexEntry, NoteColor, NoteType, NoteFormat, Workspace, Tag, NoteQuery, TrashNoteEntry, AppInfo } from './types'
 import { renderMarkdown, detectMarkdownSyntax } from './lib/markdown'
-import { matchShortcut, formatShortcut, detectShortcutConflict } from './lib/shortcuts'
+import { matchShortcut, formatShortcut, detectShortcutConflict, matchesShortcutString } from './lib/shortcuts'
 import { sortNotes, isExpiringSoon, getDraftTtlMs, type SortBy } from './lib/notes'
 import { DEFAULT_TOGGLE_SHORTCUT, DEFAULT_NEW_SHORTCUT, DEFAULT_COPY_SHORTCUT, NOTE_COLORS, COLOR_HEX } from './lib/constants'
 import { normalizeFontName } from './lib/format'
@@ -14,10 +14,17 @@ import { NotesPanel, type NoteFilter } from './components/NotesPanel'
 import { EditorArea, type OutlineItem } from './components/EditorArea'
 import { SearchReplacePanel } from './components/SearchReplacePanel'
 import { useSearchReplace } from './hooks/useSearchReplace'
+import { ExternalChangeDialog } from './components/ExternalChangeDialog'
+import { RecentFilesPalette, type RecentFileEntry } from './components/RecentFilesPalette'
 
 function App() {
   const { t, i18n } = useTranslation()
   // === 编辑器状态 ===
+  // v1.3.2 bug 修复：HTML textarea 浏览器自动把 \r\n normalize 为 \n。
+  // 如果 React state 保留 CRLF，match.start 偏移会大于 ta.value.length
+  // → setSelectionRange 被 clamp 到末尾 → caret 错位、滚动错位
+  // 因此 setText 时统一 normalize（CRLF → LF；单独 CR → LF）
+  const normalizeText = useCallback((s: string): string => s.replace(/\r\n?/g, '\n'), [])
   const [text, setText] = useState('')
   // === 编辑器模式：code=代码编辑模式，preview=MD 渲染阅读模式 ===
   const [editorMode, setEditorMode] = useState<'code' | 'preview'>('code')
@@ -25,6 +32,13 @@ function App() {
   const [editorFormat, setEditorFormat] = useState<NoteFormat>('plain')
   // === 文件模式状态（通过双击 .md 文件打开时） ===
   const [fileInfo, setFileInfo] = useState<{ filePath: string; fileName: string } | null>(null)
+
+  // v1.3.0 需求 2：文件外部变更检测
+  // 检测到外部修改时弹出 dialog，用户选"重载"或"保留我的修改"
+  const [externalChange, setExternalChange] = useState<{ filePath: string; fileName: string } | null>(null)
+  // v1.3.0 需求 3：历史打开文件记录
+  const [recentFilesOpen, setRecentFilesOpen] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([])
   // === 笔记状态 ===
   const [notes, setNotes] = useState<NoteIndexEntry[]>([])
   const [currentNote, setCurrentNote] = useState<Note | null>(null)
@@ -68,6 +82,9 @@ function App() {
   const [newShortcutInput, setNewShortcutInput] = useState('')
   const [copyShortcut, setCopyShortcut] = useState('')
   const [copyShortcutInput, setCopyShortcutInput] = useState('')
+  // v1.3.0 需求 3：历史文件面板快捷键（默认 Ctrl+Shift+O）
+  const [recentFilesShortcut, setRecentFilesShortcut] = useState('Control+Shift+O')
+  const [recentFilesShortcutInput, setRecentFilesShortcutInput] = useState('Control+Shift+O')
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   // 关闭最后一个窗口时的行为：hide=隐藏到托盘，confirm=弹窗确认退出，quit=直接退出
   const [closeLastWindowBehavior, setCloseLastWindowBehavior] = useState<'hide' | 'confirm' | 'quit'>('hide')
@@ -93,6 +110,10 @@ function App() {
   const [navbarButtons, setNavbarButtons] = useState({
     pin: true, color: true, newBtn: true,
     copy: true, notes: true, settings: true,
+    // v1.3.0 需求 3：最近打开文件按钮（用户可在导航栏设置里隐藏）
+    recentFiles: true,
+    // v1.3.0 后续 3：复制文件路径按钮（默认隐藏，不常用；用户在导航栏设置里开启）
+    copyPath: false,
   })
   // v1.1.0：调试面板显示开关（默认 false，管理标签页→高级中启用）
   const [showDebugTab, setShowDebugTab] = useState(false)
@@ -139,11 +160,63 @@ function App() {
   // 搜索高亮 overlay 层引用（v1.3.0 搜索替换功能）
   const overlayRef = useRef<HTMLDivElement>(null)
   // 搜索替换功能 hook（v1.3.0）
+  // v1.3.2：传入 setText 直接同步 React state（用于 replaceAll：execCommand 改 textarea.value 后）
   const searchReplace = useSearchReplace({
     text,
     onTextChange: setText,
+    setText,
     textareaRef,
   })
+  // BUG5 修复：Ctrl+F/Ctrl+H 使用 window 捕获阶段监听，确保任何焦点状态下都能呼出。
+  // 根因：React onKeyDown 仅在事件冒泡经过 React 根容器时触发；搜索面板关闭后焦点落到 <body>，
+  //       keydown 不经过 React 根，Ctrl+F 无法再触发。捕获阶段监听与焦点位置无关。
+  useEffect(() => {
+    const onGlobalKeydown = (e: KeyboardEvent) => {
+      const isMac = navigator.userAgent.includes('Mac')
+      // Ctrl+F / Cmd+F：打开搜索（仅搜索框）
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        searchReplace.openSearch(false)
+        return
+      }
+      // Ctrl+H（非 Mac）：打开替换（含替换框）
+      if (!isMac && e.ctrlKey && e.key.toLowerCase() === 'h' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        searchReplace.openSearch(true)
+        return
+      }
+      // Cmd+Alt+F（Mac）：打开替换（避免 Cmd+H 被系统占用）
+      if (isMac && e.metaKey && e.altKey && e.key.toLowerCase() === 'f' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        searchReplace.openSearch(true)
+        return
+      }
+    }
+    window.addEventListener('keydown', onGlobalKeydown, true)
+    return () => window.removeEventListener('keydown', onGlobalKeydown, true)
+  }, [searchReplace.openSearch])
+
+  // v1.3.0 需求 3：动态监听 recentFilesShortcut（用户可在设置里改）
+  // 使用 ref 镜像 state，避免每次 state 变化重建 listener 丢事件
+  const recentFilesShortcutRef = useRef(recentFilesShortcut)
+  useEffect(() => { recentFilesShortcutRef.current = recentFilesShortcut }, [recentFilesShortcut])
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const sc = recentFilesShortcutRef.current
+      if (!sc) return
+      if (!matchesShortcutString(e, sc)) return
+      // 不在 textarea 编辑模式时触发：避免破坏搜索框（搜索框是 input 也接收 ctrl+o 但优先级低）
+      // 这里采用最简策略：直接拦截（用户可改快捷键避开冲突）
+      e.preventDefault()
+      e.stopPropagation()
+      setRecentFilesOpen(true)
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [])
   // 光标行号跟踪（用于模式切换时定位）
   const cursorLineRef = useRef<number>(0)
   // 高亮行号（切换模式后短暂高亮，自动消失）
@@ -295,6 +368,10 @@ function App() {
       setNewShortcutInput(config.newShortcut)
       setCopyShortcut(config.copyShortcut)
       setCopyShortcutInput(config.copyShortcut)
+      // v1.3.0 需求 3：历史文件面板快捷键（默认 Control+Shift+O）
+      const rfShortcut = config.recentFilesShortcut || 'Control+Shift+O'
+      setRecentFilesShortcut(rfShortcut)
+      setRecentFilesShortcutInput(rfShortcut)
       setAlwaysOnTop(config.alwaysOnTop)
       setCloseLastWindowBehavior(config.closeLastWindowBehavior || 'hide')
       setDraftTtlDays(config.draftTtlDays || 3)
@@ -323,6 +400,10 @@ function App() {
         copy: config.navbarButtons?.copy !== false,
         notes: config.navbarButtons?.notes !== false,
         settings: config.navbarButtons?.settings !== false,
+        // v1.3.0 需求 3：最近打开文件按钮（默认显示）
+        recentFiles: config.navbarButtons?.recentFiles !== false,
+        // v1.3.0 后续 3：复制文件路径按钮（默认隐藏）
+        copyPath: config.navbarButtons?.copyPath === true,
       })
       // v1.1.0：加载调试面板显示配置
       setShowDebugTab(config.showDebugTab === true)
@@ -350,7 +431,7 @@ function App() {
       // v1.1.0：文件模式 — 加载文本文件内容到编辑区（支持任意纯文本格式）
       window.electronAPI.openFile(filePath).then((result) => {
         if (result) {
-          setText(result.content)
+          setText(normalizeText(result.content))
           // v1.1.0：根据文件后缀名判断格式（md/markdown 为 MD 格式，其他为纯文本）
           const ext = result.fileName.toLowerCase().match(/\.([^.]+)$/)?.[1] || ''
           const isMd = ext === 'md' || ext === 'markdown'
@@ -361,6 +442,8 @@ function App() {
           // v1.1.0：记录已保存内容（启动时加载的文件视为已保存状态）
           setLastSavedText(result.content)
           window.electronAPI.setWindowFile(result.filePath)
+          // v1.3.0 需求 3：记入最近打开文件记录
+          window.electronAPI.addRecentFile(result.filePath, result.content).catch(() => {})
         }
       })
     }
@@ -1136,6 +1219,37 @@ function App() {
     setCopyShortcutInput('')
   }, [])
 
+  // v1.3.0 需求 3：历史文件面板快捷键 handler（默认 Control+Shift+O）
+  const handleSaveRecentFilesShortcut = useCallback(async () => {
+    if (recentFilesShortcutInput === '' || recentFilesShortcutInput.trim()) {
+      // 冲突检测（与 toggle/new/copy 三个对比）
+      if (recentFilesShortcutInput.trim()) {
+        const conflict = detectShortcutConflict(recentFilesShortcutInput, [toggleShortcut, newShortcut, copyShortcut])
+        if (conflict) {
+          window.alert(t('settings.shortcutConflict', { conflict: formatShortcut(conflict) }))
+          return
+        }
+      }
+      const success = await window.electronAPI.setLocalShortcut('recentFiles', recentFilesShortcutInput)
+      if (success) {
+        setRecentFilesShortcut(recentFilesShortcutInput)
+      }
+    }
+  }, [recentFilesShortcutInput, toggleShortcut, newShortcut, copyShortcut, t])
+
+  const handleResetRecentFilesShortcut = useCallback(async () => {
+    const defaultShortcut = 'Control+Shift+O'
+    const success = await window.electronAPI.setLocalShortcut('recentFiles', defaultShortcut)
+    if (success) {
+      setRecentFilesShortcut(defaultShortcut)
+      setRecentFilesShortcutInput(defaultShortcut)
+    }
+  }, [])
+
+  const handleClearRecentFilesShortcut = useCallback(async () => {
+    setRecentFilesShortcutInput('')
+  }, [])
+
   const handleAlwaysOnTopChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.checked
     const applied = await window.electronAPI.setAlwaysOnTop(next)
@@ -1474,7 +1588,7 @@ function App() {
         // 清除笔记关联，避免后续自动保存用文件内容覆盖旧笔记
         setCurrentNote(null)
         setCurrentNoteId(null)
-        setText(result.content)
+        setText(normalizeText(result.content))
         // 根据文件后缀名判断格式（md/markdown 为 MD 格式，其他为纯文本）
         const ext = result.fileName.toLowerCase().match(/\.([^.]+)$/)?.[1] || ''
         const isMd = ext === 'md' || ext === 'markdown'
@@ -1484,6 +1598,8 @@ function App() {
         setFileInfo({ filePath: result.filePath, fileName: result.fileName })
         setLastSavedText(result.content)
         window.electronAPI.setWindowFile(result.filePath)
+        // v1.3.0 需求 3：记入最近打开文件记录
+        window.electronAPI.addRecentFile(result.filePath, result.content).catch(() => {})
       }
     })
   }, [checkUnsavedAndExecute])
@@ -1541,7 +1657,7 @@ function App() {
       if (result) {
         setCurrentNote(null)
         setCurrentNoteId(null)
-        setText(result.content)
+        setText(normalizeText(result.content))
         // v1.1.0：根据文件后缀名判断格式（md/markdown 为 MD 格式，其他为纯文本）
         const ext = result.fileName.toLowerCase().match(/\.([^.]+)$/)?.[1] || ''
         const isMd = ext === 'md' || ext === 'markdown'
@@ -1551,9 +1667,23 @@ function App() {
         setFileInfo({ filePath: result.filePath, fileName: result.fileName })
         setLastSavedText(result.content)
         window.electronAPI.setWindowFile(result.filePath)
+        // v1.3.0 需求 3：菜单打开文件也记入最近打开记录（之前漏了）
+        window.electronAPI.addRecentFile(result.filePath, result.content).catch(() => {})
       }
     })
   }, [checkUnsavedAndExecute])
+
+  // v1.3.0 需求 3+：复制当前打开文件的完整路径到剪贴板（菜单入口）
+  const handleCopyFilePath = useCallback(async () => {
+    if (!fileInfo) return
+    try {
+      await navigator.clipboard.writeText(fileInfo.filePath)
+      setToastMessage(t('editor.pathCopied', '路径已复制'))
+      safeTimeout(() => { setToastMessage(null) }, 1500)
+    } catch (err) {
+      console.error('复制文件路径失败:', err)
+    }
+  }, [fileInfo, t])
 
   // v1.1.0：另存为
   const handleSaveAs = useCallback(async () => {
@@ -1662,7 +1792,7 @@ function App() {
         // 清除笔记关联，避免后续自动保存用文件内容覆盖旧笔记
         setCurrentNote(null)
         setCurrentNoteId(null)
-        setText(result.content)
+        setText(normalizeText(result.content))
         // v1.1.0：根据文件后缀名判断格式（md/markdown 为 MD 格式，其他为纯文本）
         const ext = result.fileName.toLowerCase().match(/\.([^.]+)$/)?.[1] || ''
         const isMd = ext === 'md' || ext === 'markdown'
@@ -1673,6 +1803,8 @@ function App() {
         // v1.1.0：记录已保存内容 + 同步主进程窗口文件状态
         setLastSavedText(result.content)
         window.electronAPI.setWindowFile(result.filePath)
+        // v1.3.0 需求 3：拖入文件也记入最近打开记录（之前漏了）
+        window.electronAPI.addRecentFile(result.filePath, result.content).catch(() => {})
       }
     })
   }, [checkUnsavedAndExecute])
@@ -1680,6 +1812,65 @@ function App() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     // 必须 preventDefault 才能触发 drop 事件
     e.preventDefault()
+  }, [])
+
+  // v1.3.0 需求 2：监听主进程的 file:external-change 事件，弹窗提示用户
+  useEffect(() => {
+    const off = window.electronAPI.onFileExternalChange(({ filePath }) => {
+      // 只在当前打开的文件路径匹配时弹窗
+      if (fileInfo && fileInfo.filePath === filePath) {
+        setExternalChange({ filePath, fileName: fileInfo.fileName })
+      }
+    })
+    return off
+  }, [fileInfo])
+
+  // v1.3.0 需求 3：打开面板时异步加载最近文件
+  useEffect(() => {
+    if (recentFilesOpen) {
+      window.electronAPI.getRecentFiles().then(setRecentFiles).catch(() => setRecentFiles([]))
+    }
+  }, [recentFilesOpen])
+
+  // v1.3.0 需求 3：重新打开文件时记入 recent files
+  // （loadFileFromExternal 末尾 / setFileInfo 处触发即可）
+
+  // v1.3.0 需求 2：外部变更弹窗 - 用户点"重载"（覆盖当前编辑内容为磁盘最新版）
+  const handleExternalReload = useCallback(async () => {
+    if (!externalChange) return
+    const result = await window.electronAPI.reloadFile(externalChange.filePath)
+    if (result.success && result.content !== undefined) {
+      setText(normalizeText(result.content))
+      setLastSavedText(result.content)
+      setExternalChange(null)
+      setToastMessage(t('file.externalChange.reloaded'))
+      safeTimeout(() => { setToastMessage(null) }, 1500)
+    } else {
+      setExternalChange(null)
+      setToastMessage(t('file.externalChange.reloadFailed', { error: result.error || 'unknown' }))
+      safeTimeout(() => { setToastMessage(null) }, 2000)
+    }
+  }, [externalChange, t])
+
+  // v1.3.0 需求 2：外部变更弹窗 - 用户点"保留我的修改"
+  const handleExternalKeep = useCallback(() => {
+    if (!externalChange) return
+    window.electronAPI.setWindowFile(null)
+    setExternalChange(null)
+    setToastMessage(t('file.externalChange.kept'))
+    safeTimeout(() => { setToastMessage(null) }, 1500)
+  }, [externalChange, t])
+
+  // v1.3.0 需求 3：最近文件面板 - 选择某条记录
+  const handleRecentFileSelect = useCallback((filePath: string) => {
+    setRecentFilesOpen(false)
+    loadFileFromExternal(filePath)
+  }, [loadFileFromExternal])
+
+  // v1.3.0 需求 3：最近文件面板 - 清空
+  const handleRecentFilesClear = useCallback(async () => {
+    await window.electronAPI.clearRecentFiles()
+    setRecentFiles([])
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -1707,9 +1898,9 @@ function App() {
         return
       }
     }
-    if (matchShortcut(e, newShortcut)) {
-      e.preventDefault()
-      // v1.1.3 修复 Bug M-4：newShortcut 改走 handleNewWithCheck，统一经过未保存检查
+    // // v1.3.0 需求 3：历史打开文件面板快捷键改用 window 全局捕获监听器（与 Ctrl+F 一致）
+    // 用户可自定义，参见 matchesShortcutString + useEffect(recentFilesShortcut)
+    if (matchShortcut(e, newShortcut)) {// v1.1.3 修复 Bug M-4：newShortcut 改走 handleNewWithCheck，统一经过未保存检查
       //   根因：原代码直接调用 handleNew()，绕过 checkUnsavedAndExecute，
       //   文件模式下未保存的修改会被静默丢弃（不弹窗、不保存）。
       handleNewWithCheck()
@@ -2082,6 +2273,10 @@ function App() {
                   <button className="context-menu-item" onClick={() => { setShowFileMenu(false); handleSaveAs() }}>
                     {t('titlebar.fileSaveAs', '另存为...')}
                   </button>
+                  {/* v1.3.0 需求 3：最近打开文件 - 手动入口（不依赖快捷键） */}
+                  <button className="context-menu-item" onClick={() => { setShowFileMenu(false); setRecentFilesOpen(true) }}>
+                    {t('titlebar.fileRecent', '最近打开...')}
+                  </button>
                   {fileInfo && (
                     <button className="context-menu-item" onClick={() => { setShowFileMenu(false); handleCloseFile() }}>
                       {t('titlebar.fileClose', '关闭文件')}
@@ -2090,6 +2285,11 @@ function App() {
                   {fileInfo && (
                     <button className="context-menu-item" onClick={() => { setShowFileMenu(false); window.electronAPI.showFileInFolder(fileInfo.filePath) }}>
                       {t('titlebar.fileShowInFolder', '跳转文件所在文件夹')}
+                    </button>
+                  )}
+                  {fileInfo && (
+                    <button className="context-menu-item" onClick={() => { setShowFileMenu(false); handleCopyFilePath() }}>
+                      {t('titlebar.fileCopyPath', '复制文件路径')}
                     </button>
                   )}
                   <div className="context-menu-separator" />
@@ -2189,6 +2389,33 @@ function App() {
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
             )}
+          </button>
+          )}
+          {navbarButtons.recentFiles && (
+          <button
+            className="btn btn-recent"
+            onClick={() => setRecentFilesOpen(true)}
+            title={recentFilesShortcut ? t('titlebar.recentFilesWithShortcut', { shortcut: formatShortcut(recentFilesShortcut) }) : t('titlebar.recentFiles')}
+            aria-label={t('titlebar.recentFiles')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 15 14" />
+            </svg>
+          </button>
+          )}
+          {navbarButtons.copyPath && (
+          <button
+            className="btn btn-copy-path"
+            onClick={handleCopyFilePath}
+            disabled={!fileInfo}
+            title={fileInfo ? t('titlebar.copyPath', '复制文件路径') : t('titlebar.copyPathNoFile', '请先打开文件')}
+            aria-label={t('titlebar.copyPath', '复制文件路径')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
           </button>
           )}
           {navbarButtons.notes && (
@@ -2301,7 +2528,31 @@ function App() {
           searchMatches={searchReplace.state.matches}
           searchCurrentIndex={searchReplace.state.currentIndex}
           searchIsActive={searchReplace.state.isActive}
+          searchNavTick={searchReplace.state.navTick}
+          searchQuery={searchReplace.state.query}
+          searchOptions={searchReplace.state.options}
         />
+
+        {/* v1.3.0 需求 2：文件外部变更弹窗（模式 A：手动确认重载） */}
+        {externalChange && (
+          <ExternalChangeDialog
+            fileName={externalChange.fileName}
+            filePath={externalChange.filePath}
+            onReload={handleExternalReload}
+            onKeep={handleExternalKeep}
+            onClose={() => setExternalChange(null)}
+          />
+        )}
+
+        {/* v1.3.0 需求 3：历史打开文件命令面板（Ctrl+Shift+O 唤起） */}
+        {recentFilesOpen && (
+          <RecentFilesPalette
+            entries={recentFiles}
+            onSelect={handleRecentFileSelect}
+            onClose={() => setRecentFilesOpen(false)}
+            onClear={handleRecentFilesClear}
+          />
+        )}
 
         {/* 搜索替换面板（v1.3.0）— 右上角悬浮，Ctrl+F / Ctrl+H 唤起 */}
         {searchReplace.state.isActive && (
@@ -2320,6 +2571,7 @@ function App() {
                 safeTimeout(() => { setToastMessage(null) }, 1500)
               }
             }}
+            onToggleReplace={searchReplace.toggleReplace}
             onClose={searchReplace.closeSearch}
           />
         )}
@@ -2438,18 +2690,24 @@ function App() {
             newShortcutInput={newShortcutInput}
             copyShortcut={copyShortcut}
             copyShortcutInput={copyShortcutInput}
+            // v1.3.0 需求 3：历史文件面板快捷键设置项
+            recentFilesShortcut={recentFilesShortcut}
+            recentFilesShortcutInput={recentFilesShortcutInput}
             recordingTarget={recordingTarget}
             onSetRecordingTarget={setRecordingTarget}
             onShortcutKeyDown={handleShortcutKeyDown}
             onSaveToggleShortcut={handleSaveToggleShortcut}
             onSaveNewShortcut={handleSaveNewShortcut}
             onSaveCopyShortcut={handleSaveCopyShortcut}
+            onSaveRecentFilesShortcut={handleSaveRecentFilesShortcut}
             onResetToggleShortcut={handleResetToggleShortcut}
             onResetNewShortcut={handleResetNewShortcut}
             onResetCopyShortcut={handleResetCopyShortcut}
+            onResetRecentFilesShortcut={handleResetRecentFilesShortcut}
             onClearToggleShortcut={handleClearToggleShortcut}
             onClearNewShortcut={handleClearNewShortcut}
             onClearCopyShortcut={handleClearCopyShortcut}
+            onClearRecentFilesShortcut={handleClearRecentFilesShortcut}
             debugMode={debugMode}
             debugLogs={debugLogs}
             onDebugModeChange={handleDebugModeChange}

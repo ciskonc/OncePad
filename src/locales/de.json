@@ -17,7 +17,13 @@
     "fileSaveAs": "Speichern unter...",
     "fileClose": "Datei schließen",
     "fileShowInFolder": "Im Ordner anzeigen",
-    "about": "Über {{name}}"
+    "about": "Über {{name}}",
+    "fileRecent": "最近打开...",
+    "recentFiles": "最近打开",
+    "recentFilesWithShortcut": "最近打开 ({{shortcut}})",
+    "fileCopyPath": "Copy file path",
+    "copyPath": "Copy file path",
+    "copyPathNoFile": "Open a file first"
   },
   "editor": {
     "placeholder": "Hier tippen...",
@@ -34,7 +40,8 @@
     "chars": "{{count}} Zeichen",
     "lines": "{{count}} Zeilen",
     "outline": "Gliederung",
-    "linkOpenConfirm": "Diesen Link im Standardbrowser des Systems öffnen?"
+    "linkOpenConfirm": "Diesen Link im Standardbrowser des Systems öffnen?",
+    "pathCopied": "Path copied"
   },
   "notes": {
     "title": "Notizen",
@@ -238,7 +245,11 @@
     "fileAssociationDesc": "Verwalten, welche Dateitypen OncePad verarbeitet. Markdown und Klartext sind standardmäßig zugeordnet; andere können manuell aktiviert werden.",
     "fileAssociationDefault": "Standardzuordnungen (aktiviert)",
     "fileAssociationBatNote": "Zu .bat / .cmd-Dateien",
-    "fileAssociationBatNoteDesc": "OncePad übernimmt niemals .bat / .cmd-Dateizuordnungen, um sicherzustellen, dass Entwickler Batch-Skripte normal verwenden können. Um .bat-Dateien in OncePad zu bearbeiten, klicken Sie mit der rechten Maustaste und wählen \"Öffnen mit\"."
+    "fileAssociationBatNoteDesc": "OncePad übernimmt niemals .bat / .cmd-Dateizuordnungen, um sicherzustellen, dass Entwickler Batch-Skripte normal verwenden können. Um .bat-Dateien in OncePad zu bearbeiten, klicken Sie mit der rechten Maustaste und wählen \"Öffnen mit\".",
+    "recentFilesShortcut": "历史打开文件面板快捷键",
+    "recentFilesShortcutHint": "唤起历史打开文件命令面板（默认 Ctrl+Shift+O）",
+    "navbarRecentFiles": "最近打开文件",
+    "navbarCopyPath": "Copy file path"
   },
   "about": {
     "description": "Ein leichter, jederzeit verfügbarer Notizblock",
@@ -265,6 +276,30 @@
     "noMatch": "Keine Treffer",
     "close": "Schließen",
     "regexError": "Regex-Fehler: {{message}}",
-    "replacedCount": "{{count}} Vorkommen ersetzt"
+    "replacedCount": "{{count}} Vorkommen ersetzt",
+    "expandReplace": "Ersetzen erweitern",
+    "collapseReplace": "Ersetzen einklappen"
+  },
+  "file": {
+    "externalChange": {
+      "title": "文件已被外部修改",
+      "desc": "文件 \"{{fileName}}\" 在磁盘上被修改。如何处理？",
+      "keep": "保留我的修改",
+      "reload": "重载（用磁盘最新版）",
+      "reloaded": "已重载",
+      "kept": "已保留我的修改",
+      "reloadFailed": "重载失败：{{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "最近打开的文件",
+    "placeholder": "搜索文件名或路径...",
+    "empty": "暂无最近打开的文件",
+    "noMatch": "无匹配项",
+    "clear": "清空",
+    "confirmClear": "确定要清空最近打开的文件记录吗？",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintClose": "关闭"
   }
 }

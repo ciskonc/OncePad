@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncText: (text: string) => ipcRenderer.invoke('sync-text', text),
   getConfig: () => ipcRenderer.invoke('get-config'),
   setShortcut: (shortcut: string) => ipcRenderer.invoke('set-shortcut', shortcut),
-  setLocalShortcut: (name: 'new' | 'copy', shortcut: string) => ipcRenderer.invoke('set-local-shortcut', name, shortcut),
+  setLocalShortcut: (name: 'new' | 'copy' | 'recentFiles', shortcut: string) => ipcRenderer.invoke('set-local-shortcut', name, shortcut),
   setAlwaysOnTop: (alwaysOnTop: boolean) => ipcRenderer.invoke('set-always-on-top', alwaysOnTop),
   setIndent: (indentType: string, indentSize: number) => ipcRenderer.invoke('set-indent', indentType, indentSize),
   getSystemFonts: () => ipcRenderer.invoke('get-system-fonts'),
@@ -121,6 +121,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLogsPath: () => ipcRenderer.invoke('get-logs-path'),
   // v1.1.1：渲染进程写入错误日志（前端 window.onerror 捕获后通过 IPC 发送）
   writeErrorLog: (message: string) => ipcRenderer.invoke('write-error-log', message),
+
+  // ===== v1.3.0 需求 2：文件外部变更 =====
+  // 读取最新文件内容（外部变更弹窗"重载"按钮调）
+  reloadFile: (filePath: string) => ipcRenderer.invoke('reload-file', filePath),
+  // 监听主进程发来的"文件被外部修改"事件
+  onFileExternalChange: (callback: (info: { filePath: string; eventType: string }) => void) => {
+    const listener = (_e: IpcRendererEvent, info: { filePath: string; eventType: string }) => callback(info)
+    ipcRenderer.on('file:external-change', listener)
+    return () => ipcRenderer.removeListener('file:external-change', listener)
+  },
+
+  // ===== v1.3.0 需求 3：历史打开文件记录 =====
+  addRecentFile: (filePath: string, preview: string) => ipcRenderer.invoke('add-recent-file', filePath, preview),
+  getRecentFiles: () => ipcRenderer.invoke('get-recent-files'),
+  clearRecentFiles: () => ipcRenderer.invoke('clear-recent-files'),
 
   // ===== 调试日志 IPC 方法 =====
   writeDebugLog: (message: string) => ipcRenderer.invoke('write-debug-log', message),

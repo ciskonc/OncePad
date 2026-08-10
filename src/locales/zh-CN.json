@@ -17,7 +17,13 @@
     "fileSaveAs": "另存为...",
     "fileClose": "关闭文件",
     "fileShowInFolder": "跳转文件所在文件夹",
-    "about": "关于 {{name}}"
+    "about": "关于 {{name}}",
+    "fileRecent": "最近打开...",
+    "recentFiles": "最近打开",
+    "recentFilesWithShortcut": "最近打开 ({{shortcut}})",
+    "fileCopyPath": "复制文件路径",
+    "copyPath": "复制文件路径",
+    "copyPathNoFile": "请先打开文件"
   },
   "editor": {
     "placeholder": "在此输入...",
@@ -33,7 +39,8 @@
     "words": "{{count}} 字",
     "chars": "{{count}} 字符",
     "lines": "{{count}} 行",
-    "outline": "大纲"
+    "outline": "大纲",
+    "pathCopied": "路径已复制"
   },
   "notes": {
     "title": "笔记",
@@ -237,7 +244,11 @@
     "fileAssociationDesc": "管理 OncePad 关联的文件类型。默认关联 Markdown 和纯文本文件，其他类型可手动开启。",
     "fileAssociationDefault": "默认关联（已启用）",
     "fileAssociationBatNote": "关于 .bat / .cmd 文件",
-    "fileAssociationBatNoteDesc": "OncePad 永远不会接管 .bat / .cmd 文件关联，以保证开发者正常使用批处理脚本。如需用 OncePad 编辑 .bat 文件，请右键选择“打开方式”。"
+    "fileAssociationBatNoteDesc": "OncePad 永远不会接管 .bat / .cmd 文件关联，以保证开发者正常使用批处理脚本。如需用 OncePad 编辑 .bat 文件，请右键选择“打开方式”。",
+    "recentFilesShortcut": "历史打开文件面板快捷键",
+    "recentFilesShortcutHint": "唤起历史打开文件命令面板（默认 Ctrl+Shift+O）",
+    "navbarRecentFiles": "最近打开文件",
+    "navbarCopyPath": "复制文件路径"
   },
   "about": {
     "description": "轻量级即唤即用的随身笔记本，所有零散文字都有一处安放之地",
@@ -263,7 +274,31 @@
     "matchCount": "{{current}}/{{total}}",
     "noMatch": "无匹配",
     "close": "关闭",
+    "expandReplace": "展开替换",
+    "collapseReplace": "收起替换",
     "regexError": "正则错误：{{message}}",
     "replacedCount": "已替换 {{count}} 处"
+  },
+  "file": {
+    "externalChange": {
+      "title": "文件已被外部修改",
+      "desc": "文件 \"{{fileName}}\" 在磁盘上被修改。如何处理？",
+      "keep": "保留我的修改",
+      "reload": "重载（用磁盘最新版）",
+      "reloaded": "已重载",
+      "kept": "已保留我的修改",
+      "reloadFailed": "重载失败：{{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "最近打开的文件",
+    "placeholder": "搜索文件名或路径...",
+    "empty": "暂无最近打开的文件",
+    "noMatch": "无匹配项",
+    "clear": "清空",
+    "confirmClear": "确定要清空最近打开的文件记录吗？",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintClose": "关闭"
   }
 }

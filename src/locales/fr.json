@@ -17,7 +17,13 @@
     "fileSaveAs": "Enregistrer sous...",
     "fileClose": "Fermer le fichier",
     "fileShowInFolder": "Afficher dans le dossier",
-    "about": "À propos de {{name}}"
+    "about": "À propos de {{name}}",
+    "fileRecent": "最近打开...",
+    "recentFiles": "最近打开",
+    "recentFilesWithShortcut": "最近打开 ({{shortcut}})",
+    "fileCopyPath": "Copy file path",
+    "copyPath": "Copy file path",
+    "copyPathNoFile": "Open a file first"
   },
   "editor": {
     "placeholder": "Écrivez ici...",
@@ -34,7 +40,8 @@
     "chars": "{{count}} caractères",
     "lines": "{{count}} lignes",
     "outline": "Plan",
-    "linkOpenConfirm": "Ouvrir ce lien dans le navigateur par défaut du système ?"
+    "linkOpenConfirm": "Ouvrir ce lien dans le navigateur par défaut du système ?",
+    "pathCopied": "Path copied"
   },
   "notes": {
     "title": "Notes",
@@ -238,7 +245,11 @@
     "fileAssociationDesc": "Gérer les types de fichiers traités par OncePad. Markdown et texte brut sont associés par défaut ; les autres peuvent être activés manuellement.",
     "fileAssociationDefault": "Associations par défaut (activées)",
     "fileAssociationBatNote": "À propos des fichiers .bat / .cmd",
-    "fileAssociationBatNoteDesc": "OncePad ne reprend jamais les associations de fichiers .bat / .cmd pour garantir que les développeurs puissent utiliser les scripts batch normalement. Pour éditer des fichiers .bat dans OncePad, faites un clic droit et choisissez « Ouvrir avec »."
+    "fileAssociationBatNoteDesc": "OncePad ne reprend jamais les associations de fichiers .bat / .cmd pour garantir que les développeurs puissent utiliser les scripts batch normalement. Pour éditer des fichiers .bat dans OncePad, faites un clic droit et choisissez « Ouvrir avec ».",
+    "recentFilesShortcut": "历史打开文件面板快捷键",
+    "recentFilesShortcutHint": "唤起历史打开文件命令面板（默认 Ctrl+Shift+O）",
+    "navbarRecentFiles": "最近打开文件",
+    "navbarCopyPath": "Copy file path"
   },
   "about": {
     "description": "Un bloc-notes léger, toujours disponible",
@@ -265,6 +276,30 @@
     "noMatch": "Aucun résultat",
     "close": "Fermer",
     "regexError": "Erreur regex : {{message}}",
-    "replacedCount": "{{count}} occurrence(s) remplacée(s)"
+    "replacedCount": "{{count}} occurrence(s) remplacée(s)",
+    "expandReplace": "Développer le remplacement",
+    "collapseReplace": "Réduire le remplacement"
+  },
+  "file": {
+    "externalChange": {
+      "title": "文件已被外部修改",
+      "desc": "文件 \"{{fileName}}\" 在磁盘上被修改。如何处理？",
+      "keep": "保留我的修改",
+      "reload": "重载（用磁盘最新版）",
+      "reloaded": "已重载",
+      "kept": "已保留我的修改",
+      "reloadFailed": "重载失败：{{error}}"
+    }
+  },
+  "recentFiles": {
+    "title": "最近打开的文件",
+    "placeholder": "搜索文件名或路径...",
+    "empty": "暂无最近打开的文件",
+    "noMatch": "无匹配项",
+    "clear": "清空",
+    "confirmClear": "确定要清空最近打开的文件记录吗？",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintClose": "关闭"
   }
 }

@@ -104,6 +104,8 @@ export interface AppConfig {
   shortcut: string
   newShortcut: string
   copyShortcut: string
+  // v1.3.0 需求 3：历史文件面板快捷键（默认 Control+Shift+O）
+  recentFilesShortcut?: string
   alwaysOnTop: boolean
   indentType: 'space' | 'tab'
   indentSize: number
@@ -133,6 +135,10 @@ export interface AppConfig {
     copy: boolean
     notes: boolean
     settings: boolean
+    // v1.3.0 需求 3：最近打开文件按钮（用户可在导航栏设置里隐藏）
+    recentFiles: boolean
+    // v1.3.0 后续 3：复制文件路径按钮（用户可在导航栏设置里隐藏）
+    copyPath: boolean
   }
   // v1.1.0：是否显示调试面板（默认 false）
   showDebugTab?: boolean
@@ -168,7 +174,7 @@ export interface ElectronAPI {
   syncText: (text: string) => Promise<void>
   getConfig: () => Promise<AppConfig>
   setShortcut: (shortcut: string) => Promise<boolean>
-  setLocalShortcut: (name: 'new' | 'copy', shortcut: string) => Promise<boolean>
+  setLocalShortcut: (name: 'new' | 'copy' | 'recentFiles', shortcut: string) => Promise<boolean>
   setAlwaysOnTop: (alwaysOnTop: boolean) => Promise<boolean>
   setIndent: (indentType: string, indentSize: number) => Promise<void>
   getSystemFonts: () => Promise<string[]>
@@ -271,6 +277,13 @@ export interface ElectronAPI {
   openExternal: (url: string) => Promise<boolean>
   // v1.1.0：强制关闭窗口
   forceCloseWindow: () => Promise<void>
+  // v1.3.0 需求 2：文件外部变更
+  reloadFile: (filePath: string) => Promise<{ success: boolean; content?: string; mtimeMs?: number; error?: string }>
+  onFileExternalChange: (callback: (info: { filePath: string; eventType: string }) => void) => () => void
+  // v1.3.0 需求 3：历史打开文件记录
+  addRecentFile: (filePath: string, preview: string) => Promise<boolean>
+  getRecentFiles: () => Promise<Array<{ filePath: string; fileName: string; lastOpenedAt: string; preview: string }>>
+  clearRecentFiles: () => Promise<boolean>
   // v1.1.0：监听主进程关闭请求
   // v1.1.3 修复 Bug M-2：返回移除函数，避免监听器累积
   onRequestClose: (callback: () => void) => () => void

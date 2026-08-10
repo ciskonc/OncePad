@@ -67,6 +67,11 @@ interface EditorAreaProps {
   searchMatches: Match[]
   searchCurrentIndex: number
   searchIsActive: boolean
+  // v1.3.0 导航信号（主动导航/打开搜索时递增，驱动滚动定位）
+  searchNavTick: number
+  // v1.3.0 搜索查询词与选项（预览模式 mark.js 高亮用）
+  searchQuery: string
+  searchOptions: { caseSensitive: boolean; wholeWord: boolean; regex: boolean }
 }
 
 export function EditorArea(props: EditorAreaProps) {
@@ -153,6 +158,11 @@ export function EditorArea(props: EditorAreaProps) {
   //   与用户真正按的 Enter 是两次独立事件。第一次会创建建议，第二次会立即取消它。
   // 解决方案：compositionend 后 50ms 内的 Enter 视为 IME 确认 Enter，不创建建议。
   const lastCompositionEndRef = useRef(0)
+  // v1.3.2 Bug #1 修复：刚接受过建议的标志
+  // 用户接受建议（如 "2. "）后按 Enter 想继续换行，lineText="2. " trim==prefix.trim()
+  // 旧代码会误判为"空列表项退出列表"，把 "2. " 和前面的 \n 都清空。
+  // 修复：接受建议时设 true，下一次 Enter 在该分支跳过退出逻辑。
+  const seqJustAcceptedRef = useRef(false)
 
   /**
    * 测量 textarea 中指定字符位置的光标像素坐标（相对于 editor-container）
@@ -229,6 +239,7 @@ export function EditorArea(props: EditorAreaProps) {
       textarea.selectionStart = newPos
       textarea.selectionEnd = newPos
     })
+    seqJustAcceptedRef.current = true
     setSeqSuggestion(null)
   }, [onTextChange])
 
@@ -389,18 +400,28 @@ export function EditorArea(props: EditorAreaProps) {
 
     // 特殊情况：当前行只有序号前缀（无内容），按 Enter 应结束列表（清空当前行）
     // 这是 VS Code / Typora 的标准行为：空列表项按 Enter = 退出列表
+    // v1.3.2 Bug #1 修复：如果刚接受过建议，光标在新序号行末尾，
+    //   用户按 Enter 是想"再换一行继续"，不是退出列表——跳过此分支正常生成下一行建议。
     if (lineText.trim() === prefix.trim()) {
-      e.preventDefault()
-      // 清空当前行（保留前导空白，移除序号前缀）
-      const leadingWhitespace = lineText.match(/^\s*/)?.[0] || ''
-      const newValue = value.slice(0, lineStart) + leadingWhitespace + value.slice(lineEnd)
-      onTextChange(newValue)
-      const newPos = lineStart + leadingWhitespace.length
-      requestAnimationFrame(() => {
-        textarea.selectionStart = newPos
-        textarea.selectionEnd = newPos
-      })
-      return
+      if (seqJustAcceptedRef.current) {
+        // 跳过退出分支，继续到下方"生成下一行序号"逻辑
+        seqJustAcceptedRef.current = false
+      } else {
+        e.preventDefault()
+        // 清空当前行（保留前导空白，移除序号前缀）
+        const leadingWhitespace = lineText.match(/^\s*/)?.[0] || ''
+        const newValue = value.slice(0, lineStart) + leadingWhitespace + value.slice(lineEnd)
+        onTextChange(newValue)
+        const newPos = lineStart + leadingWhitespace.length
+        requestAnimationFrame(() => {
+          textarea.selectionStart = newPos
+          textarea.selectionEnd = newPos
+        })
+        return
+      }
+    } else {
+      // 当前行有内容（非空列表项）→ 重置 just-accepted 标志
+      seqJustAcceptedRef.current = false
     }
 
     // 生成下一行序号前缀
