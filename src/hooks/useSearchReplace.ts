@@ -62,6 +62,9 @@ export function useSearchReplace(params: {
   textareaRef: RefObject<HTMLTextAreaElement>
   /** v1.3.2：直接传入 setState 函数（用于 replaceAll 同步 React state，避免通过 onTextChange 整体替换） */
   setText?: (text: string) => void
+  /** v1.3.2：当前编辑器模式（'code' | 'preview'）。preview 模式下 textarea 不存在，
+   *  navigateMatch 改用 navAnchor 计算当前位置 */
+  editorMode?: 'code' | 'preview'
 }) {
   const [state, setState] = useState<SearchState>(initialState)
   // ref 镜像：避免 keydown 闭包捕获陈旧 state（参考 EditorArea seqSuggestionRef 模式）
@@ -179,7 +182,16 @@ export function useSearchReplace(params: {
 
   /** 关闭搜索面板 */
   const closeSearch = useCallback(() => {
-    setState(s => ({ ...s, isActive: false }))
+    // v1.3.2：关闭时重置 matches/currentIndex/navAnchor，
+    // 避免下次 openSearch 时残留上次的定位导致 matchCount 显示错乱
+    setState(s => ({
+      ...s,
+      isActive: false,
+      matches: [],
+      currentIndex: -1,
+      navAnchor: -1,
+    }))
+    stateRef.current = { ...stateRef.current, matches: [], currentIndex: -1, navAnchor: -1 }
   }, [])
 
   /** 更新搜索词 */
@@ -212,20 +224,50 @@ export function useSearchReplace(params: {
    */
   const navigateMatch = useCallback((direction: 'next' | 'prev') => {
     const matches = stateRef.current.matches
-    const textarea = params.textareaRef.current
     if (matches.length === 0) return
-    if (!textarea) return
-    const caretPos = textarea.selectionStart
+    const textarea = params.textareaRef.current
+    // v1.3.2 P1 修复：preview 模式下 textarea 不存在（已切到 MD 预览），
+    //   此时无法读 caretPos，改用 navAnchor 作为导航起点
+    //   （navAnchor 是上次定位位置；首次为 -1 = 从头开始）
+    // v1.3.2 P2 修复：code 模式下也用 navAnchor（不用 selectionStart），
+    //   原因：用户在 match 中间点击时，selectionStart 在 match 中间而非末尾，
+    //   next 找 start > caretPos 时会跳过同一 match 内部，直接找下一个，
+    //   但**用户视觉焦点已停在当前 match 上**，连续按 next 应该重新找当前 match 之后。
+    //   navAnchor 在 navigateMatch 中被更新为 result.anchor（即新匹配 start），
+    //   保证连续 next 找到正确的下一个。
+    let caretPos: number
+    if (textarea) {
+      // 优先用 navAnchor（上次定位点）；首次未设置（-1）时回退到 selectionStart
+      const anchor = stateRef.current.navAnchor
+      caretPos = anchor >= 0 ? anchor : textarea.selectionStart
+    } else if (params.editorMode === 'preview') {
+      // preview 模式：用 navAnchor（stateRef 保证最新值，避免 React 批处理竞态）
+      caretPos = stateRef.current.navAnchor
+    } else {
+      return
+    }
     const result = direction === 'next'
       ? findNextByAnchor(matches, caretPos)
       : findPrevByAnchor(matches, caretPos)
+    const ta = params.textareaRef.current
     setState(s => ({
       ...s,
       currentIndex: result.index,
       navTick: s.navTick + 1,
       navAnchor: result.anchor,
     }))
-  }, [findNextByAnchor, findPrevByAnchor, params.textareaRef])
+    stateRef.current = { ...stateRef.current, currentIndex: result.index, navTick: stateRef.current.navTick + 1, navAnchor: result.anchor }
+  }, [findNextByAnchor, findPrevByAnchor, params.textareaRef, params.editorMode])
+
+  /**
+   * 用户手动移动光标后重置 navAnchor
+   * 这样下次 navigateMatch 基于新的 selectionStart 重新计算，
+   * 实现"鼠标移动后 next/prev 从当前位置开始"的行为（VS Code/Sublime 风格）
+   */
+  const resetNavAnchor = useCallback(() => {
+    stateRef.current = { ...stateRef.current, navAnchor: -1 }
+    setState(s => (s.navAnchor === -1 ? s : { ...s, navAnchor: -1 }))
+  }, [])
 
   /**
    * 替换当前匹配
@@ -387,6 +429,9 @@ export function useSearchReplace(params: {
               const caretPos = textarea.selectionStart
               const nextResult = findNextByAnchor(matches, caretPos)
               newIndex = nextResult.index
+              // v1.3.2 P2 修复：effect 计算时也写入 navAnchor，
+              //   否则 navigateMatch 用 anchor=-1 → 回退 selectionStart（已被 setRangeText 改了）
+              // 写 state 时同步更新 stateRef
             } else {
               newIndex = 0
             }
@@ -421,5 +466,6 @@ export function useSearchReplace(params: {
     navigateMatch,
     replaceCurrent,
     replaceAll,
+    resetNavAnchor,
   }
 }

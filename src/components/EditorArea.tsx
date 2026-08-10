@@ -4,6 +4,10 @@ import { useTranslation } from 'react-i18next'
 import type { NoteFormat } from '../types'
 import { parseListPrefix, nextListPrefix } from '../lib/sequence'
 import type { Match } from '../hooks/useSearchReplace'
+// v1.3.2 P1 修复：preview 模式搜索高亮 + 滚动定位（mark.js）
+// 之前浏览模式下 searchMatches 计数 OK 但无任何视图反馈：overlay 只在 code 模式渲染
+// 这里用 mark.js 给 preview 容器内的文本节点打 mark + scrollIntoView 定位
+import Mark from 'mark.js'
 
 // 大纲项：标题级别 + 文本 + 所在行号
 export type OutlineItem = { level: number; text: string; line: number }
@@ -56,6 +60,8 @@ interface EditorAreaProps {
   onUpdateCursorLine: () => void
   onToggleEditorMode: () => void
   onJumpToLine: (line: number) => void
+  // v1.3.2 P7：编辑文本后重置搜索 navAnchor，让下次 next/prev 基于新 caret
+  onResetSearchNavAnchor?: () => void
   // Toast 反馈
   toastMessage: string | null
   // v1.1.2 修复 Bug M-5：minimap 诊断日志受 debugMode 控制，生产环境不写入
@@ -107,12 +113,15 @@ export function EditorArea(props: EditorAreaProps) {
     onUpdateCursorLine,
     onToggleEditorMode,
     onJumpToLine,
+    onResetSearchNavAnchor,
     debugMode,
     linkClickBehavior,
     overlayRef,
     searchMatches,
     searchCurrentIndex,
     searchIsActive,
+    searchQuery,
+    searchOptions,
   } = props
 
   // 行号栏 ref：用于与 textarea 同步滚动
@@ -955,6 +964,10 @@ export function EditorArea(props: EditorAreaProps) {
   const prevMatchesLengthRef = useRef(0)
   // P0-1 修复：缓存 text 内容，文本编辑后匹配数相同时也需重建 innerHTML（否则 overlay 显示旧文本）
   const prevTextRef = useRef('')
+  // v1.3.2 P5 修复：mode toggle 后第一次 effect 跑时跳过 scrollToCurrentMatch
+  //   （toggleEditorMode preview→code 已基于 search match line 设置了 scrollTop）
+  //   用 prevEditorModeRef 检测 mode 变化
+  const prevEditorModeRef = useRef(editorMode)
 
   /** HTML 转义（防止 XSS，overlay innerHTML 构建时使用） */
   function escapeHtml(s: string): string {
@@ -976,6 +989,8 @@ export function EditorArea(props: EditorAreaProps) {
     overlay.style.lineHeight = taStyle.lineHeight
     overlay.style.letterSpacing = taStyle.letterSpacing
     overlay.style.tabSize = taStyle.tabSize
+    // v1.3.2 P4 修复：先重置 shorthand padding（防止 CSS .editor-overlay { padding: 24px 32px } 覆盖单独 paddingLeft 等）
+    overlay.style.padding = ''
     overlay.style.paddingTop = taStyle.paddingTop
     overlay.style.paddingRight = taStyle.paddingRight
     overlay.style.paddingBottom = taStyle.paddingBottom
@@ -987,10 +1002,14 @@ export function EditorArea(props: EditorAreaProps) {
     overlay.style.whiteSpace = taStyle.whiteSpace || 'pre-wrap'
     overlay.style.wordBreak = taStyle.wordBreak || 'normal'
     overlay.style.overflowWrap = taStyle.overflowWrap || 'break-word'
-    // 宽度 = clientWidth - paddingLeft - paddingRight（与 mirror div 计算方式一致，注意 showMinimap 时 paddingRight=96px）
-    const paddingLeft = parseFloat(taStyle.paddingLeft) || 0
-    const paddingRight = parseFloat(taStyle.paddingRight) || 0
-    overlay.style.width = `${textarea.clientWidth - paddingLeft - paddingRight}px`
+    // v1.3.2 P6 修复：overlay.width 必须等于 textarea.clientWidth（不是 clientWidth - padding）
+    //   原因：textarea clientWidth 已包含 padding 内部的内容区（border-box），
+    //   overlay 是 absolute 定位、grid-column: 2，物理宽度应等于 grid cell 宽度 = textarea.clientWidth
+    //   再加 padding 让 overlay 文字内容区 = textarea 文字内容区（clientWidth - paddingLeft - paddingRight）
+    //   旧逻辑：overlay.width = clientWidth - padding → overlay 物理宽度 = 950 (含 padding)
+    //   → overlay 文字内容区 = 950 - 64 = 886（比 textarea 文字 950 少 64px）
+    //   → wrap 行数不一致 → 文本位置错乱（mark 与 textarea 文字对不齐）
+    overlay.style.width = `${textarea.clientWidth}px`
   }, [])
 
   /**
@@ -1062,11 +1081,17 @@ export function EditorArea(props: EditorAreaProps) {
       const taStyle = getComputedStyle(textarea)
       // P1-5 修复：同步 width（clientWidth 含 padding 但不含 border/scrollbar，与 textarea 内容区一致）
       mirrorDiv.style.width = `${textarea.clientWidth}px`
+      // v1.3.2 P4 修复：先重置 shorthand padding（JSX inline style: padding: '0' 会覆盖单独的 paddingTop 等）
+      mirrorDiv.style.padding = ''
       // P1-4 修复：同步 padding（使 scrollHeight 包含 padding，计算时减去 paddingTop 得到纯文本高度）
       mirrorDiv.style.paddingTop = taStyle.paddingTop
       mirrorDiv.style.paddingRight = taStyle.paddingRight
       mirrorDiv.style.paddingBottom = taStyle.paddingBottom
       mirrorDiv.style.paddingLeft = taStyle.paddingLeft
+      // v1.3.2 P4 修复：同步 box-sizing（textarea 默认 content-box，mirror div 必须一致，否则 width 计算不同）
+      mirrorDiv.style.boxSizing = taStyle.boxSizing || 'content-box'
+      // v1.3.2 P4 修复：同步 overflow-wrap（textarea 默认 overflow-wrap: break-word，影响 wrap 行为）
+      mirrorDiv.style.overflowWrap = taStyle.overflowWrap || 'break-word'
       mirrorDiv.style.fontFamily = taStyle.fontFamily
       mirrorDiv.style.fontSize = taStyle.fontSize
       mirrorDiv.style.lineHeight = taStyle.lineHeight
@@ -1119,10 +1144,91 @@ export function EditorArea(props: EditorAreaProps) {
     textarea.classList.add('with-search')
 
     // 滚动到当前匹配项
+    // v1.3.2 P5 修复：仅当 matches/currentIndex 变化时滚动（用户主动 next/prev/输入）
+    //   mode 切换时 scrollTop 已由 toggleEditorMode 处理（基于 search match line 计算），
+    //   scrollToCurrentMatch 若再覆盖会让 caret 位置与用户预期不一致
+    const isModeJustChanged = prevEditorModeRef.current !== editorMode
+    prevEditorModeRef.current = editorMode
     if (searchCurrentIndex >= 0 && searchCurrentIndex < searchMatches.length) {
-      scrollToCurrentMatch(textarea, searchMatches[searchCurrentIndex], searchMirrorRef.current)
+      if (isModeJustChanged) {
+        // mode toggle 后：只设置 selectionRange（caret 位置），不覆盖 scrollTop
+        textarea.focus()
+        textarea.setSelectionRange(searchMatches[searchCurrentIndex].start, searchMatches[searchCurrentIndex].end)
+      } else {
+        scrollToCurrentMatch(textarea, searchMatches[searchCurrentIndex], searchMirrorRef.current)
+      }
     }
   }, [searchMatches, searchCurrentIndex, searchIsActive, editorMode, text, textareaRef, overlayRef, syncOverlayStyle, renderOverlayHighlight, scrollToCurrentMatch])
+
+  // v1.3.2 P1 修复：preview 模式搜索高亮 + 滚动
+  // 之前浏览模式下搜索无任何视图反馈（overlay 仅 code 模式渲染，preview 文本不滚动）
+  // 这里用 mark.js 给 preview 容器（previewRef）打 mark，再 scrollIntoView 定位当前匹配
+  useEffect(() => {
+    const preview = previewRef.current
+    if (!preview) return
+    // 非预览模式：清空 mark
+    if (!searchIsActive || editorMode !== 'preview' || !searchQuery) {
+      const existing = preview.querySelectorAll('mark')
+      existing.forEach(m => {
+        const text = document.createTextNode(m.textContent || '')
+        m.parentNode?.replaceChild(text, m)
+      })
+      preview.normalize()
+      return
+    }
+    // preview 模式 + 搜索激活 + 有 query：用 mark.js 高亮
+    try {
+      const instance = new Mark(preview)
+      // unmark + mark 会破坏 DOM 结构（mark.js 会拆文本节点），
+      // 但因为 preview 是 dangerouslySetInnerHTML，下一次 text 变化时 React 会重建，
+      // 所以临时破坏是可接受的
+      instance.unmark({
+        done: () => {
+          // 计算正则
+          let pattern: RegExp
+          try {
+            if (searchOptions.regex) {
+              const flags = 'g' + (searchOptions.caseSensitive ? '' : 'i') + 'u'
+              pattern = new RegExp(searchQuery, flags)
+            } else {
+              const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\  }, [searchMatches, searchCurrentIndex, searchIsActive, editorMode, text, textareaRef, overlayRef, syncOverlayStyle, renderOverlayHighlight, scrollToCurrentMatch])')
+              const flags = 'g' + (searchOptions.caseSensitive ? '' : 'i') + 'u'
+              const finalPattern = searchOptions.wholeWord ? '\\b' + escaped + '\\b' : escaped
+              pattern = new RegExp(finalPattern, flags)
+            }
+          } catch {
+            return // 正则错误跳过
+          }
+          // 跨元素匹配 — mark.js 默认 exclude: ['script','style'] 已够用
+          instance.markRegExp(pattern, {
+            acrossElements: true,
+            done: (count: number) => {
+              // 高亮完成后，定位到当前匹配项（scrollIntoView）
+              // v1.3.2 P1 修复：用 'instant' 而非 'smooth'：
+              //   smooth 滚动是异步，连续按 next 时上一次滚动未完成就被打断，
+              //   导致视图停留在第 1 个匹配，看起来搜索"不工作"
+              const marks = preview.querySelectorAll('mark')
+              // v1.3.2 P3 修复：标记当前匹配为 current class（与其他匹配区分开），
+              //   否则预览模式所有匹配统一黄色，用户看不出跳到哪
+              marks.forEach((m, idx) => {
+                if (idx === searchCurrentIndex) {
+                  m.className = 'search-match-current'
+                } else {
+                  m.className = 'search-match'
+                }
+              })
+              if (searchCurrentIndex >= 0 && searchCurrentIndex < marks.length) {
+                marks[searchCurrentIndex].scrollIntoView({ block: 'center', behavior: 'instant' })
+              }
+            },
+          })
+        },
+      })
+    } catch (e) {
+      // mark.js 异常忽略，不影响搜索功能
+      console.warn('[preview search] mark.js failed:', e)
+    }
+  }, [searchIsActive, searchQuery, searchOptions, searchCurrentIndex, editorMode, text])
 
   return (
     <>
@@ -1221,7 +1327,11 @@ export function EditorArea(props: EditorAreaProps) {
             paddingRight: (showMinimap && editorMode === 'code') ? '96px' : '32px',
           }}
           value={text}
-          onChange={(e) => onTextChange(e.target.value)}
+          onChange={(e) => {
+            onTextChange(e.target.value)
+            // v1.3.2 P7 修复：编辑文本后光标位置变化，重置 navAnchor 让下次 next/prev 用新 caret
+            onResetSearchNavAnchor?.()
+          }}
           onKeyDown={(e) => {
             // v1.1.0 修复：优先处理序号补全，避免 onTabKey 先插入缩进导致 Tab 接受建议时双重处理
             // 原问题：onTabKey 先调用并 preventDefault + 插入缩进，handleSequenceKeyDown 不被调用，

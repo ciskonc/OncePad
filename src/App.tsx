@@ -166,6 +166,8 @@ function App() {
     onTextChange: setText,
     setText,
     textareaRef,
+    // v1.3.2 P1 修复：传入 editorMode 让 hook 在 preview 模式下用 navAnchor 计算 navigate
+    editorMode,
   })
   // BUG5 修复：Ctrl+F/Ctrl+H 使用 window 捕获阶段监听，确保任何焦点状态下都能呼出。
   // 根因：React onKeyDown 仅在事件冒泡经过 React 根容器时触发；搜索面板关闭后焦点落到 <body>，
@@ -219,6 +221,11 @@ function App() {
   }, [])
   // 光标行号跟踪（用于模式切换时定位）
   const cursorLineRef = useRef<number>(0)
+  // v1.3.2 P5 修复：searchReplace ref（让 toggleEditorMode 等 useCallback 始终引用最新 searchReplace）
+  const searchReplaceRef = useRef(searchReplace)
+  useEffect(() => { searchReplaceRef.current = searchReplace }, [searchReplace])
+  // v1.3.2 P5 修复：match.start 直接定位字符位置（避免 markdown 空行干扰）
+  const matchStartRef = useRef<number>(-1)
   // 高亮行号（切换模式后短暂高亮，自动消失）
   const [highlightLine, setHighlightLine] = useState<number>(-1)
   // 预览区高亮带Y坐标（用于模式切换时显示位置指示）
@@ -499,6 +506,9 @@ function App() {
     const pos = textarea.selectionStart
     const lines = textarea.value.slice(0, pos).split('\n')
     cursorLineRef.current = lines.length - 1
+    // v1.3.2 P7 修复：用户手动移动光标后重置 navAnchor，
+    //   下次 navigateMatch 基于新的 selectionStart 计算（VS Code 风格）
+    searchReplaceRef.current?.resetNavAnchor?.()
   }, [])
 
   useEffect(() => {
@@ -2151,6 +2161,21 @@ function App() {
       const preview = previewRef.current
       let targetLine = cursorLineRef.current
 
+      // v1.3.2 P5 修复：若搜索激活，targetLine 应为当前搜索匹配项的行号，
+      //   否则用户在浏览模式下搜索 → 切回编辑模式，caret 会跑到与 mark 不一致的位置
+      //   （用户报告：浏览模式下搜索 → 切回编辑模式 → caret 与 mark 偏移，且越往下越大）
+      const sr = searchReplaceRef.current
+      if (sr && sr.state.isActive && sr.state.matches.length > 0
+          && sr.state.currentIndex >= 0
+          && sr.state.currentIndex < sr.state.matches.length) {
+        const match = sr.state.matches[sr.state.currentIndex]
+        targetLine = match.line
+        cursorLineRef.current = targetLine
+        // v1.3.2 P5 修复：直接用 match.start 作为 caret 字符位置，
+        //   而不是用 targetLine 累加计算（targetLine 可能受 markdown 空行干扰导致 pos 偏移）
+        matchStartRef.current = match.start
+      }
+
       if (preview) {
         // 遍历所有 data-source-line 元素，找到视口 1/3 处对应的行号
         // 不使用 elementFromPoint（返回的元素起始行号可能偏上），而是精确计算
@@ -2205,8 +2230,14 @@ function App() {
         // 将光标定位到对应行
         const lines = text.split('\n')
         let pos = 0
-        for (let i = 0; i < targetLine && i < lines.length; i++) {
-          pos += lines[i].length + 1
+        // v1.3.2 P5 修复：matchStartRef 设置时优先用其值（搜索 match 字符位置）
+        if (matchStartRef.current >= 0) {
+          pos = matchStartRef.current
+          matchStartRef.current = -1  // 一次性
+        } else {
+          for (let i = 0; i < targetLine && i < lines.length; i++) {
+            pos += lines[i].length + 1
+          }
         }
         textarea.selectionStart = pos
         textarea.selectionEnd = pos
@@ -2216,6 +2247,27 @@ function App() {
         const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20
         const desiredScroll = targetLine * lineHeight - textarea.clientHeight / 2
         textarea.scrollTop = Math.max(0, desiredScroll)
+        // v1.3.2 P5 修复：搜索激活时，确保 match 行在视野内（targetLine = match.line）
+        //   用 scrollToCurrentMatch 重新精确定位（处理 wrap、soft-wrap、minimap 等情况）
+        if (sr && sr.state.isActive && sr.state.matches.length > 0
+            && sr.state.currentIndex >= 0
+            && sr.state.currentIndex < sr.state.matches.length) {
+          // 滚动到当前 match 视觉位置（offsetTop from mirror div 精确测量）
+          // 这里借用 searchMirrorRef，但 toggleEditorMode 在 App 层无法直接访问 EditorArea 的 ref
+          // 改为简单策略：让 match 行在视野 1/3 处
+          const match = sr.state.matches[sr.state.currentIndex]
+          const matchLine = match.line
+          // match 行在 textarea 内的 vertical offset = paddingTop + matchLine * lineHeight
+          // 视觉 line 可能比 text line 多（wrap），用 scrollToCurrentMatch 思路：
+          //   但 toggleEditorMode 在 App 层，无法访问 searchMirrorRef
+          //   折中：targetLine 已经 = match.line（前面已设），desiredScroll 已尽量让 match 在中央
+          // 当 desiredScroll 是负数（match 在视野上半部）时，scrollTop 应保持 0（顶部对齐）
+          // 当 desiredScroll > maxScroll 时，scrollTop = maxScroll（底部对齐）
+          const maxScroll = textarea.scrollHeight - textarea.clientHeight
+          if (desiredScroll > maxScroll) {
+            textarea.scrollTop = Math.max(0, maxScroll)
+          }
+        }
 
         // 计算目标行在编辑器容器中的 Y 坐标，用于行级高亮 overlay
         // 行 Y = padding-top + targetLine * lineHeight - scrollTop
@@ -2515,6 +2567,7 @@ function App() {
           onUpdateCursorLine={updateCursorLine}
           onToggleEditorMode={toggleEditorMode}
           onJumpToLine={jumpToLine}
+          onResetSearchNavAnchor={() => searchReplaceRef.current?.resetNavAnchor?.()}
           toastMessage={toastMessage}
           showLineNumbers={showLineNumbers}
           lineNumberMode={lineNumberMode}

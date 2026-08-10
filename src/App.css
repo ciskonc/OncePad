@@ -808,6 +808,11 @@ body {
 .editor-container.with-gutter .editor-gutter {
   grid-row: 1;
   grid-column: 1;
+  /* v1.3.2 P1 修复：抬高 gutter z-index，确保搜索激活时
+     overlay 文字（限制在 editor 列后）不会被 gutter 边缘的
+     border-right 视觉覆盖 */
+  z-index: 3;
+  position: relative;
 }
 .editor-container.with-gutter .editor {
   grid-row: 1;
@@ -2291,6 +2296,10 @@ body {
   width: 100%;
   height: 100%;
   z-index: 1;
+  /* v1.3.2 P1 修复：行号模式下 overlay 必须限制在 editor 列内（CSS grid 流方式）
+     overlay 作为 grid item + position:absolute，浏览器按 grid-area 定位
+     默认 grid-column 未指定 → auto 流，会跨整个 grid 宽度
+     在 with-gutter 时显式设为 grid-column:2 让其只占 editor 列 */
   pointer-events: none;
   /* 搜索激活时 overlay 承接文本显示（textarea 变透明），故用主文本色；
      非搜索时 overlay 为空 div，无影响。mark 高亮通过背景色区分、文字继承此颜色 */
@@ -2307,6 +2316,21 @@ body {
 .editor-overlay::-webkit-scrollbar {
   display: none;
 }
+/* v1.3.2 P1 修复：行号模式 (with-gutter) 下，overlay 限定到第 2 列 (editor 列)
+   gutter 在 grid-column:1，editor 在 grid-column:2
+   overlay 用 position:absolute，CSS grid 的 grid-column 仍生效（按 grid-area 定位）
+   容器用 grid-template-columns: auto 1fr，overlay 自动占满 editor 列宽度 */
+.editor-container.with-gutter .editor-overlay {
+  grid-column: 2;
+  width: auto;
+  left: 0;
+  right: 0;
+}
+/* v1.3.2 P1 修复：行号模式 (with-gutter) 下，overlay 限定到第 2 列 (editor 列)
+   gutter 在 grid-row:1 / grid-column:1，editor 在 grid-row:1 / grid-column:2
+   容器用 display:grid + grid-template-columns: auto 1fr，
+   overlay 是绝对定位不参与 grid 流，所以需要手动避开 gutter 列 */
+
 
 /* 编辑器 textarea 透明文字 + 可见光标（搜索激活时添加 with-search class）
    BUG1 修复：caret-color 由 var(--text)（未定义，回退为透明）改为 var(--text-primary)，
@@ -2316,7 +2340,7 @@ body {
   color: transparent;
   caret-color: var(--text-primary);
   position: relative;
-  z-index: 2;
+  z-index: 4;
 }
 
 /* 搜索匹配高亮（半透明黄色背景 + 文字继承父级颜色保持可见） */
