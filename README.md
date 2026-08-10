@@ -32,6 +32,7 @@ Press a global shortcut to summon it, type your text, press again — and it's a
 - 🔢 **Line numbers** — Optional, with logical or visual numbering modes
 - 📑 **Outline** — Quick navigation via document headings
 - 🗺️ **Minimap** — Document overview for fast scrolling (experimental)
+- 🔍 **Search & Replace** — VS Code-style find (Ctrl+F) and replace (Ctrl+H), supports regex / case-sensitive / whole-word; works in both code and preview modes with current-match highlight
 - 🔢 **Sequence suggestion** — VS Code-style inline autocomplete for numbered lists (1. / a. / ① / 一、 / -)
 - 📂 **File menu** — Open / save / save as files directly; drag-and-drop text files (.md / .txt / .log / code files)
 - 📄 **Broad format support** — Opens any plain-text file, even with uncommon extensions (content-aware detection)
@@ -77,6 +78,7 @@ Press a global shortcut to summon it, type your text, press again — and it's a
 | Editor | Outline | Quick navigation via document headings |
 | Editor | Minimap | Document overview (experimental) |
 | Editor | Sequence suggestion | VS Code-style inline autocomplete for numbered lists |
+| Editor | Search & Replace | Find (Ctrl+F) / Replace (Ctrl+H) with regex & case & whole-word options |
 | Editor | Font customization | Separate EN/CN fonts, size, line height, padding |
 | Editor | UI scaling | 80%-150% interface scaling |
 | Files | Open via dialog | System file dialog with broad format filters |
@@ -93,6 +95,9 @@ Press a global shortcut to summon it, type your text, press again — and it's a
 | Shortcuts | Toggle window | Global shortcut (default: Alt+Q) |
 | Shortcuts | New note | Global shortcut (customizable, default: empty) |
 | Shortcuts | Copy | Global shortcut (customizable, default: empty) |
+| Shortcuts | Find | Ctrl+F / Cmd+F |
+| Shortcuts | Replace | Ctrl+H / Cmd+Alt+F |
+| Shortcuts | Find next / prev | Enter / Shift+Enter |
 
 </details>
 
